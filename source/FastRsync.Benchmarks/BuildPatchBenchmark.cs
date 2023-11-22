@@ -17,11 +17,12 @@ namespace FastRsync.Benchmarks
 
         private byte[] newFileData;
 
-        private readonly DeltaBuilder deltaBuilder = new DeltaBuilder();
+        private readonly DeltaBuilder deltaBuilder = new();
 
         private MemoryStream newDataStream;
         private MemoryStream baseSignatureSha1Stream;
-        private MemoryStream baseSignaturexxHashStream;
+        private MemoryStream baseSignatureXxHashStream;
+        private MemoryStream baseSignatureXxHash3Stream;
         private MemoryStream baseSignatureMd5Stream;
 
         [GlobalSetup]
@@ -41,8 +42,15 @@ namespace FastRsync.Benchmarks
             {
                 var xxHashSignatureBuilder = new SignatureBuilder(SupportedAlgorithms.Hashing.XxHash(),
                     SupportedAlgorithms.Checksum.Adler32Rolling());
-                baseSignaturexxHashStream = new MemoryStream();
-                xxHashSignatureBuilder.Build(baseDataStream, new SignatureWriter(baseSignaturexxHashStream));
+                baseSignatureXxHashStream = new MemoryStream();
+                xxHashSignatureBuilder.Build(baseDataStream, new SignatureWriter(baseSignatureXxHashStream));
+            }
+
+            {
+                var xxHash3SignatureBuilder = new SignatureBuilder(SupportedAlgorithms.Hashing.XxHash3(),
+                    SupportedAlgorithms.Checksum.Adler32Rolling());
+                baseSignatureXxHash3Stream = new MemoryStream();
+                xxHash3SignatureBuilder.Build(baseDataStream, new SignatureWriter(baseSignatureXxHashStream));
             }
 
             {
@@ -63,13 +71,25 @@ namespace FastRsync.Benchmarks
         }
 
         [Benchmark]
-        public byte[] BuildPatchxxHash()
+        public byte[] BuildPatchXxHash()
         {
             newDataStream.Seek(0, SeekOrigin.Begin);
-            baseSignaturexxHashStream.Seek(0, SeekOrigin.Begin);
+            baseSignatureXxHashStream.Seek(0, SeekOrigin.Begin);
             var deltaStream = new MemoryStream();
             
-            deltaBuilder.BuildDelta(newDataStream, new SignatureReader(baseSignaturexxHashStream, null), new AggregateCopyOperationsDecorator(new BinaryDeltaWriter(deltaStream)));
+            deltaBuilder.BuildDelta(newDataStream, new SignatureReader(baseSignatureXxHashStream, null), new AggregateCopyOperationsDecorator(new BinaryDeltaWriter(deltaStream)));
+
+            return deltaStream.ToArray();
+        }
+
+        [Benchmark]
+        public byte[] BuildPatchXxHash3()
+        {
+            newDataStream.Seek(0, SeekOrigin.Begin);
+            baseSignatureXxHash3Stream.Seek(0, SeekOrigin.Begin);
+            var deltaStream = new MemoryStream();
+
+            deltaBuilder.BuildDelta(newDataStream, new SignatureReader(baseSignatureXxHash3Stream, null), new AggregateCopyOperationsDecorator(new BinaryDeltaWriter(deltaStream)));
 
             return deltaStream.ToArray();
         }

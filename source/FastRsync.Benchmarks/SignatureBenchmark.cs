@@ -18,15 +18,17 @@ namespace FastRsync.Benchmarks
         private byte[] data;
 
         private readonly SignatureBuilder xxHashSignatureBuilder =
-            new SignatureBuilder(SupportedAlgorithms.Hashing.XxHash(), SupportedAlgorithms.Checksum.Adler32Rolling());
+            new(SupportedAlgorithms.Hashing.XxHash(), SupportedAlgorithms.Checksum.Adler32Rolling());
+        private readonly SignatureBuilder xxHash3SignatureBuilder =
+            new(SupportedAlgorithms.Hashing.XxHash3(), SupportedAlgorithms.Checksum.Adler32Rolling());
         private readonly SignatureBuilder xxHashAdler32V2SignatureBuilder =
-            new SignatureBuilder(SupportedAlgorithms.Hashing.XxHash(), SupportedAlgorithms.Checksum.Adler32RollingV2());
+            new(SupportedAlgorithms.Hashing.XxHash(), SupportedAlgorithms.Checksum.Adler32RollingV2());
         private readonly SignatureBuilder sha1SignatureBuilder =
-            new SignatureBuilder(SupportedAlgorithms.Hashing.Sha1(), SupportedAlgorithms.Checksum.Adler32Rolling());
+            new(SupportedAlgorithms.Hashing.Sha1(), SupportedAlgorithms.Checksum.Adler32Rolling());
         private readonly SignatureBuilder md5SignatureBuilder =
-            new SignatureBuilder(SupportedAlgorithms.Hashing.Md5(), SupportedAlgorithms.Checksum.Adler32Rolling());
+            new(SupportedAlgorithms.Hashing.Md5(), SupportedAlgorithms.Checksum.Adler32Rolling());
         private readonly OctodiffSignatureBuilder xxHashOctodiffSignatureBuilder =
-            new OctodiffSignatureBuilder(SupportedAlgorithms.Hashing.XxHash(), SupportedAlgorithms.Checksum.Adler32Rolling());
+            new(SupportedAlgorithms.Hashing.XxHash(), SupportedAlgorithms.Checksum.Adler32Rolling());
 
         private MemoryStream dataStream;
 
@@ -59,6 +61,15 @@ namespace FastRsync.Benchmarks
             dataStream.Seek(0, SeekOrigin.Begin);
             var signatureStream = new MemoryStream();
             xxHashAdler32V2SignatureBuilder.Build(dataStream, new SignatureWriter(signatureStream));
+            return signatureStream.ToArray();
+        }
+
+        [Benchmark]
+        public byte[] SignaturexxHash3()
+        {
+            dataStream.Seek(0, SeekOrigin.Begin);
+            var signatureStream = new MemoryStream();
+            xxHash3SignatureBuilder.Build(dataStream, new SignatureWriter(signatureStream));
             return signatureStream.ToArray();
         }
 

@@ -13,7 +13,7 @@ namespace FastRsync.Tests.OctodiffLegacy
 
         private short chunkSize;
 
-        public OctodiffSignatureBuilder() : this(SupportedAlgorithms.Hashing.Default(), SupportedAlgorithms.Checksum.Default())
+        public OctodiffSignatureBuilder() : this(SupportedAlgorithms.Hashing.Sha1(), SupportedAlgorithms.Checksum.Default())
         {
         }
 

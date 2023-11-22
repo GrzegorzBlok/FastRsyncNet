@@ -23,6 +23,11 @@ namespace FastRsync.Core
                 return new XxHashAlgorithm();
             }
 
+            public static IHashAlgorithm XxHash3()
+            {
+                return new XxHash3Algorithm();
+            }
+
             public static IHashAlgorithm Default()
             {
                 return XxHash();
@@ -34,6 +39,8 @@ namespace FastRsync.Core
                 {
                     case "XXH64":
                         return XxHash();
+                    case "XXH3":
+                        return XxHash3();
                     case "MD5":
                         return Md5();
                     case "SHA1":
