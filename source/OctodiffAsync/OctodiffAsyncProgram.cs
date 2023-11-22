@@ -6,9 +6,6 @@ using OctodiffAsync.CommandLine.Support;
 
 namespace OctodiffAsync
 {
-    /// <summary>
-    /// 
-    /// </summary>
     public class OctodiffAsyncProgram
     {
         static int Main(string[] args)

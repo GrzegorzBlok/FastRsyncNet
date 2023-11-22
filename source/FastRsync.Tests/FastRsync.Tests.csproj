@@ -1,15 +1,56 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net7.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
+  <ItemGroup>
+    <None Remove="TestData\basefile.bin" />
+    <None Remove="TestData\basefile2.bin" />
+    <None Remove="TestData\patch112.bin" />
+    <None Remove="TestData\patch200.bin" />
+    <None Remove="TestData\patch231.bin" />
+    <None Remove="TestData\signature112.bin" />
+    <None Remove="TestData\signature200.bin" />
+    <None Remove="TestData\signature231.bin" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="TestData\basefile.bin">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="TestData\basefile2.bin">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="TestData\patch112.bin">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="TestData\patch200.bin">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="TestData\patch231.bin">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="TestData\signature112.bin">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="TestData\signature200.bin">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="TestData\signature231.bin">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\FastRsync.Compression\FastRsync.Compression.csproj" />
     <ProjectReference Include="..\FastRsync\FastRsync.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="NSubstitute" Version="4.2.1" />
-    <PackageReference Include="NUnit" Version="3.13.3" />
+    <PackageReference Include="NSubstitute" Version="5.1.0" />
+    <PackageReference Include="NUnit" Version="3.14.0" />
     <PackageReference Include="NUnit3TestAdapter" Version="4.5.0" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.3.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.19.1" />
+    <PackageReference Include="System.IO.Hashing" Version="8.0.0" />
+    <PackageReference Include="System.Data.HashFunction.Core" Version="2.0.0" />
+    <PackageReference Include="System.Data.HashFunction.Interfaces" Version="2.0.0" />
+    <PackageReference Include="System.Data.HashFunction.xxHash" Version="2.0.0" />
   </ItemGroup>
 </Project>

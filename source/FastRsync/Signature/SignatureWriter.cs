@@ -1,7 +1,7 @@
 ﻿using System.IO;
+using System.Text.Json;
 using System.Threading.Tasks;
 using FastRsync.Core;
-using Newtonsoft.Json;
 
 namespace FastRsync.Signature
 {
@@ -20,7 +20,7 @@ namespace FastRsync.Signature
         {
             bw.Write(FastRsyncBinaryFormat.SignatureHeader);
             bw.Write(FastRsyncBinaryFormat.Version);
-            var metadataStr = JsonConvert.SerializeObject(metadata, JsonSerializationSettings.JsonSettings);
+            var metadataStr = JsonSerializer.Serialize(metadata, JsonSerializationSettings.JsonSettings);
             bw.Write(metadataStr);
         }
 

@@ -7,9 +7,6 @@ using Octodiff.CommandLine.Support;
 
 namespace Octodiff
 {
-    /// <summary>
-    /// 
-    /// </summary>
     public class OctodiffProgram
     {
         static int Main(string[] args)

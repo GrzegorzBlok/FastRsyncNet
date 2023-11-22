@@ -1,8 +1,8 @@
 using System;
 using System.IO;
+using System.Text.Json;
 using System.Threading.Tasks;
 using FastRsync.Core;
-using Newtonsoft.Json;
 
 namespace FastRsync.Delta
 {
@@ -23,7 +23,7 @@ namespace FastRsync.Delta
         {
             writer.Write(FastRsyncBinaryFormat.DeltaHeader);
             writer.Write(FastRsyncBinaryFormat.Version);
-            var metadataStr = JsonConvert.SerializeObject(metadata, JsonSerializationSettings.JsonSettings);
+            var metadataStr = JsonSerializer.Serialize(metadata, JsonSerializationSettings.JsonSettings);
             writer.Write(metadataStr);
         }
 

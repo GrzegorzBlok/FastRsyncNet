@@ -9,10 +9,8 @@ namespace FastRsync.Tests
     {
         public static string GetMd5(byte[] data)
         {
-            using (MD5 md5Hash = MD5.Create())
-            {
-                return Convert.ToBase64String(md5Hash.ComputeHash(data));
-            }
+            using MD5 md5Hash = MD5.Create();
+            return Convert.ToBase64String(md5Hash.ComputeHash(data));
         }
 
         public static (MemoryStream baseDataStream, MemoryStream baseSignatureStream, byte[] newData, MemoryStream newDataStream) PrepareTestData(int baseNumberOfBytes, int newDataNumberOfBytes,

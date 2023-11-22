@@ -125,7 +125,7 @@ namespace FastRsync.Tests.FastRsyncLegacy
                 throw new InvalidDataException("The delta file uses a newer file format than this program can handle.");
 
             var metadataStr = reader.ReadString();
-            _metadata = JsonConvert.DeserializeObject<DeltaMetadataLegacy>(metadataStr, JsonSerializationSettings.JsonSettings);
+            _metadata = JsonConvert.DeserializeObject<DeltaMetadataLegacy>(metadataStr, NewtonsoftJsonSerializationSettings.JsonSettings);
 
             hashAlgorithm = SupportedAlgorithms.Hashing.Create(_metadata.HashAlgorithm);
             expectedHash = Convert.FromBase64String(_metadata.ExpectedFileHash);

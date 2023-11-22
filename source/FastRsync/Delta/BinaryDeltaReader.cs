@@ -1,12 +1,12 @@
 using System;
 using System.Collections;
 using System.IO;
+using System.Text.Json;
 using System.Threading.Tasks;
 using FastRsync.Core;
 using FastRsync.Diagnostics;
 using FastRsync.Hash;
 using FastRsync.Signature;
-using Newtonsoft.Json;
 
 namespace FastRsync.Delta
 {
@@ -95,7 +95,7 @@ namespace FastRsync.Delta
                 throw new InvalidDataException("The delta file uses a newer file format than this program can handle.");
 
             var metadataStr = reader.ReadString();
-            _metadata = JsonConvert.DeserializeObject<DeltaMetadata>(metadataStr, JsonSerializationSettings.JsonSettings);
+            _metadata = JsonSerializer.Deserialize<DeltaMetadata>(metadataStr, JsonSerializationSettings.JsonSettings);
 
             hashAlgorithm = SupportedAlgorithms.Hashing.Create(_metadata.HashAlgorithm);
             expectedHash = Convert.FromBase64String(_metadata.ExpectedFileHash);

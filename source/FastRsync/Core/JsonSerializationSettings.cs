@@ -1,5 +1,5 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
+﻿using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace FastRsync.Core
 {
@@ -7,14 +7,15 @@ namespace FastRsync.Core
     {
         static JsonSerializationSettings()
         {
-            JsonSettings = new JsonSerializerSettings
+            JsonSettings = new JsonSerializerOptions
             {
-                ContractResolver = new CamelCasePropertyNamesContractResolver(),
-                Formatting = Formatting.None,
-                NullValueHandling = NullValueHandling.Ignore
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                PropertyNameCaseInsensitive = true,
+                WriteIndented = false,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
             };
         }
 
-        public static JsonSerializerSettings JsonSettings { get; }
+        public static JsonSerializerOptions JsonSettings { get; }
     }
 }

@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Data.HashFunction.xxHash;
+using System.IO.Hashing;
 using System.IO;
 using System.Threading.Tasks;
 
@@ -10,31 +10,35 @@ namespace FastRsync.Hash
         public string Name => "XXH64";
         public int HashLength => 64/8;
 
-        private readonly IxxHash algorithm;
-
-        public XxHashAlgorithm()
-        {
-            algorithm = xxHashFactory.Instance.Create(new xxHashConfig
-            {
-                HashSizeInBits = 64
-            });
-        }
+        private readonly NonCryptographicHashAlgorithm algorithm = new XxHash64();
 
         public byte[] ComputeHash(Stream stream)
-        {
-            return algorithm.ComputeHash(stream).Hash;
+        { 
+            algorithm.Append(stream);
+            var hash = algorithm.GetHashAndReset();
+            Array.Reverse(hash);
+
+            return hash;
         }
 
         public async Task<byte[]> ComputeHashAsync(Stream stream)
         {
-            return (await algorithm.ComputeHashAsync(stream).ConfigureAwait(false)).Hash;
+            await algorithm.AppendAsync(stream);
+            var hash = algorithm.GetHashAndReset();
+            Array.Reverse(hash);
+
+            return hash;
         }
 
         public byte[] ComputeHash(byte[] buffer, int offset, int length)
         {
             byte[] data = new byte[length];
             Buffer.BlockCopy(buffer, offset, data, 0, length);
-            return algorithm.ComputeHash(data).Hash;
+            algorithm.Append(data);
+            var hash = algorithm.GetHashAndReset();
+            Array.Reverse(hash);
+
+            return hash;
         }
     }
 }
