@@ -30,8 +30,7 @@ namespace FastRsync.Signature
         {
             var header = reader.ReadBytes(BinaryFormat.SignatureFormatHeaderLength);
 
-            if (StructuralComparisons.StructuralEqualityComparer.Equals(FastRsyncBinaryFormat.SignatureHeader,
-                header))
+            if (StructuralComparisons.StructuralEqualityComparer.Equals(FastRsyncBinaryFormat.SignatureHeader, header))
             {
                 return ReadFastRsyncSignatureHeader();
             }
@@ -64,8 +63,8 @@ namespace FastRsync.Signature
             if (version != OctoBinaryFormat.Version)
                 throw new InvalidDataException("The signature file uses a newer file format than this program can handle.");
 
-            var hashAlgorithm = reader.ReadString();
-            var rollingChecksumAlgorithm = reader.ReadString();
+            var hashAlgorithmName = reader.ReadString();
+            var rollingChecksumAlgorithmName = reader.ReadString();
 
             var endOfMeta = reader.ReadBytes(OctoBinaryFormat.EndOfMetadata.Length);
             if (!StructuralComparisons.StructuralEqualityComparer.Equals(OctoBinaryFormat.EndOfMetadata, endOfMeta)) 
@@ -73,15 +72,13 @@ namespace FastRsync.Signature
 
             Progress();
 
-            var hashAlgo = SupportedAlgorithms.Hashing.Create(hashAlgorithm);
-            var rollingChecksumAlgo = SupportedAlgorithms.Checksum.Create(rollingChecksumAlgorithm);
+            var hashAlgorithm = SupportedAlgorithms.Hashing.Create(hashAlgorithmName);
+            var rollingChecksumAlgorithm = SupportedAlgorithms.Checksum.Create(rollingChecksumAlgorithmName);
             var signature = new Signature(new SignatureMetadata
                 {
-                    ChunkHashAlgorithm = hashAlgo.Name,
-                    RollingChecksumAlgorithm = rollingChecksumAlgo.Name
+                    ChunkHashAlgorithm = hashAlgorithm.Name,
+                    RollingChecksumAlgorithm = rollingChecksumAlgorithm.Name
                 }, RsyncFormatType.Octodiff);
-
-            ReadChunks(signature);
 
             return signature;
         }

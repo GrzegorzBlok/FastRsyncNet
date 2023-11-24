@@ -33,9 +33,9 @@ namespace FastRsync.Core
                 return XxHash();
             }
 
-            public static IHashAlgorithm Create(string algorithm)
+            public static IHashAlgorithm Create(string algorithmName)
             {
-                switch (algorithm)
+                switch (algorithmName)
                 {
                     case "XXH64":
                         return XxHash();
@@ -47,7 +47,7 @@ namespace FastRsync.Core
                         return Sha1();
                 }
 
-                throw new NotSupportedException($"The hash algorithm '{algorithm}' is not supported");
+                throw new NotSupportedException($"The hash algorithm '{algorithmName}' is not supported");
             }
         }
 

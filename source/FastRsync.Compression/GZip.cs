@@ -20,6 +20,7 @@
 
 using System;
 using System.IO;
+using System.Threading.Tasks;
 using Ionic.Zlib;
 
 namespace FastRsync.Compression
@@ -58,6 +59,38 @@ namespace FastRsync.Compression
                         {
                             compressor.FlushMode = FlushType.None;
                             compressor.Write(buffer, j, i + 1 - j);
+                        }
+                    }
+                }
+            }
+        }
+
+        public static async Task CompressAsync(Stream sourceStream, Stream destStream)
+        {
+            var buffer = new byte[BUFFER_SIZE];
+
+            using (var compressor = new GZipStream(destStream, Ionic.Zlib.CompressionMode.Compress,
+                       CompressionLevel.BestSpeed, true))
+            {
+                compressor.LastModified = new DateTime(1970, 1, 1);
+                uint hash = RSYNCHIT;
+                int n;
+                while ((n = await sourceStream.ReadAsync(buffer, 0, BUFFER_SIZE).ConfigureAwait(false)) > 0)
+                {
+                    for (int i = 0, j = 0; i < n; i++)
+                    {
+                        hash = ((hash << 1) ^ buffer[i]) & RSYNCMASK;
+
+                        if (hash == RSYNCHIT)
+                        {
+                            compressor.FlushMode = FlushType.Sync;
+                            await compressor.WriteAsync(buffer, j, i + 1 - j).ConfigureAwait(false);
+                            j = i + 1;
+                        }
+                        else if (i + 1 == n)
+                        {
+                            compressor.FlushMode = FlushType.None;
+                            await compressor.WriteAsync(buffer, j, i + 1 - j).ConfigureAwait(false);
                         }
                     }
                 }

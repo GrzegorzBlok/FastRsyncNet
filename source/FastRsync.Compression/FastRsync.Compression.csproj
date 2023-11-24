@@ -8,14 +8,17 @@
     <PackageId>FastRsyncNet.Compression</PackageId>
     <Product></Product>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
-    <Copyright>Copyright ©  2019</Copyright>
+    <Copyright></Copyright>
     <Description>.NET library for file compression compatible with Rsync algorithm.</Description>
     <PackageProjectUrl>https://github.com/GrzegorzBlok/FastRsyncNet</PackageProjectUrl>
     <PackageTags>sync rsync synchronization compression</PackageTags>
+    <AssemblyVersion>1.1.0</AssemblyVersion>
+    <FileVersion>1.1.0</FileVersion>
+    <Version>1.1.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="DotNetZip" Version="1.13.4" />
+    <PackageReference Include="DotNetZip" Version="1.16.0" />
   </ItemGroup>
 
 </Project>

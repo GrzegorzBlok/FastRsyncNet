@@ -21,7 +21,7 @@
              <dependency id="System.IO.Hashing" version="8.0.0" exclude="Build,Analyzers"  />
           </group>
 
-          <group targetFramework="net8.0">
+          <group targetFramework="net7.0">
              <dependency id="System.Text.Json" version="8.0.0" exclude="Build,Analyzers"  />
              <dependency id="System.IO.Hashing" version="8.0.0" exclude="Build,Analyzers"  />
           </group>
