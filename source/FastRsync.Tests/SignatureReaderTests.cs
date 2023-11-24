@@ -27,7 +27,7 @@ namespace FastRsync.Tests
             // Assert
             Assert.AreEqual(RsyncFormatType.Octodiff, target.Type);
             Assert.AreEqual(new XxHashAlgorithm().Name, target.HashAlgorithm.Name);
-            Assert.AreEqual(new XxHashAlgorithm().HashLength, target.HashAlgorithm.HashLength);
+            Assert.AreEqual(new XxHashAlgorithm().HashLengthInBytes, target.HashAlgorithm.HashLengthInBytes);
             Assert.AreEqual(new Adler32RollingChecksum().Name, target.RollingChecksumAlgorithm.Name);
 
             progressReporter.Received().Report(Arg.Any<ProgressReport>());

@@ -10,14 +10,9 @@ namespace FastRsync.Tests.OctodiffLegacy
         void WriteChunk(ChunkSignature signature);
     }
 
-    public class OctodiffSignatureWriter : IOctodiffSignatureWriter
+    public class OctodiffSignatureWriter(Stream signatureStream) : IOctodiffSignatureWriter
     {
-        private readonly BinaryWriter signaturebw;
-
-        public OctodiffSignatureWriter(Stream signatureStream)
-        {
-            this.signaturebw = new BinaryWriter(signatureStream);
-        }
+        private readonly BinaryWriter signaturebw = new(signatureStream);
 
         public void WriteMetadata(IHashAlgorithm hashAlgorithm, IRollingChecksum rollingChecksumAlgorithm)
         {

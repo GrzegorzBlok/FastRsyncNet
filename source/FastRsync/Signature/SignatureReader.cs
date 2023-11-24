@@ -88,7 +88,7 @@ namespace FastRsync.Signature
 
         private void ReadChunks(Signature signature)
         {
-            var expectedHashLength = signature.HashAlgorithm.HashLength;
+            var expectedHashLength = signature.HashAlgorithm.HashLengthInBytes;
             long start = 0;
 
             var signatureLength = reader.BaseStream.Length;

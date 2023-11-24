@@ -12,8 +12,8 @@ namespace FastRsync.Signature
 
         public SignatureWriter(Stream signatureStream)
         {
-            this._signatureStream = signatureStream;
-            this.signaturebw = new BinaryWriter(signatureStream);
+            _signatureStream = signatureStream;
+            signaturebw = new BinaryWriter(signatureStream);
         }
 
         private static void WriteMetadataInternal(BinaryWriter bw, SignatureMetadata metadata)

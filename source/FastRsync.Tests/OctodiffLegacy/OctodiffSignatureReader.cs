@@ -42,7 +42,7 @@ namespace FastRsync.Tests.OctodiffLegacy
                 hashAlgo,
                 SupportedAlgorithms.Checksum.Create(rollingChecksumAlgorithm));
 
-            var expectedHashLength = hashAlgo.HashLength;
+            var expectedHashLength = hashAlgo.HashLengthInBytes;
             long start = 0;
 
             var fileLength = reader.BaseStream.Length;

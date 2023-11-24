@@ -15,7 +15,7 @@ namespace FastRsync.Hash
         }
 
         public string Name { get; private set; }
-        public int HashLength => algorithm.HashSize / 8;
+        public int HashLengthInBytes => algorithm.HashSize / 8;
 
         public byte[] ComputeHash(Stream stream)
         {

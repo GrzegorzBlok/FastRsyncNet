@@ -41,7 +41,7 @@ namespace FastRsync.Tests
             // Assert
             Assert.AreEqual(RsyncFormatType.FastRsync, target.Type);
             Assert.AreEqual(new XxHashAlgorithm().Name, target.HashAlgorithm.Name);
-            Assert.AreEqual(new XxHashAlgorithm().HashLength, target.HashAlgorithm.HashLength);
+            Assert.AreEqual(new XxHashAlgorithm().HashLengthInBytes, target.HashAlgorithm.HashLengthInBytes);
             Assert.AreEqual(FastRsyncLegacyDeltaExpectedFileHash, target.Metadata.ExpectedFileHash);
             Assert.AreEqual("MD5", target.Metadata.ExpectedFileHashAlgorithm);
             Assert.AreEqual(new XxHashAlgorithm().Name, target.Metadata.HashAlgorithm);
@@ -65,7 +65,7 @@ namespace FastRsync.Tests
 
             // Assert
             Assert.AreEqual(new XxHashAlgorithm().Name, target.HashAlgorithm.Name);
-            Assert.AreEqual(new XxHashAlgorithm().HashLength, target.HashAlgorithm.HashLength);
+            Assert.AreEqual(new XxHashAlgorithm().HashLengthInBytes, target.HashAlgorithm.HashLengthInBytes);
             Assert.AreEqual(RsyncFormatType.FastRsync, target.Type); 
             Assert.IsNotEmpty(target.Metadata.ExpectedFileHash);
             Assert.AreEqual("MD5", target.Metadata.ExpectedFileHashAlgorithm);

@@ -14,7 +14,7 @@ namespace FastRsync.Tests
             Assert.AreEqual(RsyncFormatType.FastRsync, sig.Type);
             Assert.AreEqual(hashAlgorithm.Name, sig.HashAlgorithm.Name);
             Assert.AreEqual(hashAlgorithm.Name, sig.Metadata.ChunkHashAlgorithm);
-            Assert.AreEqual(hashAlgorithm.HashLength, sig.HashAlgorithm.HashLength);
+            Assert.AreEqual(hashAlgorithm.HashLengthInBytes, sig.HashAlgorithm.HashLengthInBytes);
             Assert.AreEqual(rollingAlgorithm.Name, sig.RollingChecksumAlgorithm.Name);
             Assert.AreEqual(rollingAlgorithm.Name, sig.Metadata.RollingChecksumAlgorithm);
             Assert.AreEqual("MD5", sig.Metadata.BaseFileHashAlgorithm);
