@@ -20,6 +20,7 @@
 
 using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using Ionic.Zlib;
 
@@ -65,7 +66,10 @@ namespace FastRsync.Compression
             }
         }
 
-        public static async Task CompressAsync(Stream sourceStream, Stream destStream)
+        public static Task CompressAsync(Stream sourceStream, Stream destStream) =>
+            CompressAsync(sourceStream, destStream, CancellationToken.None);
+
+        public static async Task CompressAsync(Stream sourceStream, Stream destStream, CancellationToken cancellationToken)
         {
             var buffer = new byte[BUFFER_SIZE];
 
@@ -75,7 +79,7 @@ namespace FastRsync.Compression
                 compressor.LastModified = new DateTime(1970, 1, 1);
                 uint hash = RSYNCHIT;
                 int n;
-                while ((n = await sourceStream.ReadAsync(buffer, 0, BUFFER_SIZE).ConfigureAwait(false)) > 0)
+                while ((n = await sourceStream.ReadAsync(buffer, 0, BUFFER_SIZE, cancellationToken).ConfigureAwait(false)) > 0)
                 {
                     for (int i = 0, j = 0; i < n; i++)
                     {
@@ -84,13 +88,13 @@ namespace FastRsync.Compression
                         if (hash == RSYNCHIT)
                         {
                             compressor.FlushMode = FlushType.Sync;
-                            await compressor.WriteAsync(buffer, j, i + 1 - j).ConfigureAwait(false);
+                            await compressor.WriteAsync(buffer, j, i + 1 - j, cancellationToken).ConfigureAwait(false);
                             j = i + 1;
                         }
                         else if (i + 1 == n)
                         {
                             compressor.FlushMode = FlushType.None;
-                            await compressor.WriteAsync(buffer, j, i + 1 - j).ConfigureAwait(false);
+                            await compressor.WriteAsync(buffer, j, i + 1 - j, cancellationToken).ConfigureAwait(false);
                         }
                     }
                 }

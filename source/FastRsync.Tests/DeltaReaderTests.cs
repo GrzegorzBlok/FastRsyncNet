@@ -1,7 +1,6 @@
 ﻿using System.IO;
 using FastRsync.Core;
 using FastRsync.Delta;
-using FastRsync.Hash;
 using FastRsync.Signature;
 using FastRsync.Tests.FastRsyncLegacy;
 using NUnit.Framework;
@@ -39,12 +38,13 @@ namespace FastRsync.Tests
             IDeltaReader target = new BinaryDeltaReader(deltaStream, null);
 
             // Assert
+            var hashAlgorithm = SupportedAlgorithms.Hashing.Default();
             Assert.AreEqual(RsyncFormatType.FastRsync, target.Type);
-            Assert.AreEqual(new XxHashAlgorithm().Name, target.HashAlgorithm.Name);
-            Assert.AreEqual(new XxHashAlgorithm().HashLengthInBytes, target.HashAlgorithm.HashLengthInBytes);
+            Assert.AreEqual(hashAlgorithm.Name, target.HashAlgorithm.Name);
+            Assert.AreEqual(hashAlgorithm.HashLengthInBytes, target.HashAlgorithm.HashLengthInBytes);
             Assert.AreEqual(FastRsyncLegacyDeltaExpectedFileHash, target.Metadata.ExpectedFileHash);
             Assert.AreEqual("MD5", target.Metadata.ExpectedFileHashAlgorithm);
-            Assert.AreEqual(new XxHashAlgorithm().Name, target.Metadata.HashAlgorithm);
+            Assert.AreEqual(hashAlgorithm.Name, target.Metadata.HashAlgorithm);
             Assert.Null(target.Metadata.BaseFileHash);
             Assert.Null(target.Metadata.BaseFileHashAlgorithm);
         }
@@ -64,12 +64,13 @@ namespace FastRsync.Tests
             var target = new BinaryDeltaReaderLegacy(deltaStream, null);
 
             // Assert
-            Assert.AreEqual(new XxHashAlgorithm().Name, target.HashAlgorithm.Name);
-            Assert.AreEqual(new XxHashAlgorithm().HashLengthInBytes, target.HashAlgorithm.HashLengthInBytes);
+            var hashAlgorithm = SupportedAlgorithms.Hashing.Default();
+            Assert.AreEqual(hashAlgorithm.Name, target.HashAlgorithm.Name);
+            Assert.AreEqual(hashAlgorithm.HashLengthInBytes, target.HashAlgorithm.HashLengthInBytes);
             Assert.AreEqual(RsyncFormatType.FastRsync, target.Type); 
             Assert.IsNotEmpty(target.Metadata.ExpectedFileHash);
             Assert.AreEqual("MD5", target.Metadata.ExpectedFileHashAlgorithm);
-            Assert.AreEqual(new XxHashAlgorithm().Name, target.Metadata.HashAlgorithm);
+            Assert.AreEqual(hashAlgorithm.Name, target.Metadata.HashAlgorithm);
         }
     }
 }

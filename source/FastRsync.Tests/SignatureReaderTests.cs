@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using FastRsync.Core;
 using FastRsync.Diagnostics;
 using FastRsync.Hash;
 using FastRsync.Signature;
@@ -25,9 +26,10 @@ namespace FastRsync.Tests
             var target = new SignatureReader(signatureStream, progressReporter).ReadSignature();
 
             // Assert
+            var hashAlgorithm = SupportedAlgorithms.Hashing.Default();
             Assert.AreEqual(RsyncFormatType.Octodiff, target.Type);
-            Assert.AreEqual(new XxHashAlgorithm().Name, target.HashAlgorithm.Name);
-            Assert.AreEqual(new XxHashAlgorithm().HashLengthInBytes, target.HashAlgorithm.HashLengthInBytes);
+            Assert.AreEqual(hashAlgorithm.Name, target.HashAlgorithm.Name);
+            Assert.AreEqual(hashAlgorithm.HashLengthInBytes, target.HashAlgorithm.HashLengthInBytes);
             Assert.AreEqual(new Adler32RollingChecksum().Name, target.RollingChecksumAlgorithm.Name);
 
             progressReporter.Received().Report(Arg.Any<ProgressReport>());

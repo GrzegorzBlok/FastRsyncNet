@@ -2,19 +2,25 @@
 using System.IO.Hashing;
 using System.IO;
 using System.Threading.Tasks;
-using System.Buffers;
 
 namespace FastRsync.Hash
 {
-    public class XxHashAlgorithm : IHashAlgorithm
+    public class NonCryptographicHashAlgorithmWrapper : IHashAlgorithm
     {
-        public string Name => "XXH64";
+        public string Name { get; }
+
         public int HashLengthInBytes => algorithm.HashLengthInBytes;
 
-        private readonly NonCryptographicHashAlgorithm algorithm = new XxHash64();
+        private readonly NonCryptographicHashAlgorithm algorithm;
+
+        public NonCryptographicHashAlgorithmWrapper(string name, NonCryptographicHashAlgorithm algorithm)
+        {
+            Name = name;
+            this.algorithm = algorithm;
+        }
 
         public byte[] ComputeHash(Stream stream)
-        { 
+        {
             algorithm.Append(stream);
             var hash = algorithm.GetHashAndReset();
             Array.Reverse(hash);

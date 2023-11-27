@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Threading.Tasks;
+using FastRsync.Core;
 using FastRsync.Diagnostics;
 using FastRsync.Hash;
 using FastRsync.Signature;
@@ -40,7 +41,7 @@ namespace FastRsync.Tests
             // Assert
             CollectionAssert.AreEqual(xxhash1037TestSignature, signatureStream.ToArray());
 
-            CommonAsserts.ValidateSignature(signatureStream, new XxHashAlgorithm(), Utils.GetMd5(data), new Adler32RollingChecksum());
+            CommonAsserts.ValidateSignature(signatureStream, SupportedAlgorithms.Hashing.XxHash(), Utils.GetMd5(data), new Adler32RollingChecksum());
 
             progressReporter.Received().Report(Arg.Any<ProgressReport>());
         }
@@ -67,7 +68,7 @@ namespace FastRsync.Tests
             // Assert
             CollectionAssert.AreEqual(xxhash1037TestSignature, signatureStream.ToArray());
 
-            CommonAsserts.ValidateSignature(signatureStream, new XxHashAlgorithm(), Utils.GetMd5(data), new Adler32RollingChecksum());
+            CommonAsserts.ValidateSignature(signatureStream, SupportedAlgorithms.Hashing.XxHash(), Utils.GetMd5(data), new Adler32RollingChecksum());
 
             progressReporter.Received().Report(Arg.Any<ProgressReport>());
         }
@@ -89,7 +90,7 @@ namespace FastRsync.Tests
             await target.BuildAsync(dataStream, new SignatureWriter(signatureStream)).ConfigureAwait(false);
 
             // Assert
-            CommonAsserts.ValidateSignature(signatureStream, new XxHashAlgorithm(), Utils.GetMd5(dataStream.ToArray()), new Adler32RollingChecksum());
+            CommonAsserts.ValidateSignature(signatureStream, SupportedAlgorithms.Hashing.XxHash(), Utils.GetMd5(dataStream.ToArray()), new Adler32RollingChecksum());
 
             progressReporter.Received().Report(Arg.Any<ProgressReport>());
         }
@@ -111,7 +112,7 @@ namespace FastRsync.Tests
             target.Build(dataStream, new SignatureWriter(signatureStream));
 
             // Assert
-            CommonAsserts.ValidateSignature(signatureStream, new XxHashAlgorithm(), Utils.GetMd5(dataStream.ToArray()), new Adler32RollingChecksum());
+            CommonAsserts.ValidateSignature(signatureStream, SupportedAlgorithms.Hashing.XxHash(), Utils.GetMd5(dataStream.ToArray()), new Adler32RollingChecksum());
 
             progressReporter.Received().Report(Arg.Any<ProgressReport>());
         }

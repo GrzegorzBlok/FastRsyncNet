@@ -4,17 +4,17 @@ using System.Threading.Tasks;
 
 namespace FastRsync.Hash
 {
-    public class HashAlgorithmWrapper : IHashAlgorithm
+    public class CryptographyHashAlgorithmWrapper : IHashAlgorithm
     {
         private readonly HashAlgorithm algorithm;
 
-        public HashAlgorithmWrapper(string name, HashAlgorithm algorithm)
+        public CryptographyHashAlgorithmWrapper(string name, HashAlgorithm algorithm)
         {
             Name = name;
             this.algorithm = algorithm;
         }
 
-        public string Name { get; private set; }
+        public string Name { get; }
         public int HashLengthInBytes => algorithm.HashSize / 8;
 
         public byte[] ComputeHash(Stream stream)

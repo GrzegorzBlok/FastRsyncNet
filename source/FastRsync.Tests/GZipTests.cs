@@ -1,11 +1,13 @@
 ﻿using System;
 using System.IO;
 using System.IO.Compression;
+using System.Threading;
 using System.Threading.Tasks;
 using FastRsync.Compression;
 using FastRsync.Core;
 using FastRsync.Delta;
 using FastRsync.Signature;
+using Newtonsoft.Json.Linq;
 using NUnit.Framework;
 
 namespace FastRsync.Tests

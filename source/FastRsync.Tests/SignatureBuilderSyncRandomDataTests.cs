@@ -42,7 +42,7 @@ namespace FastRsync.Tests
             target.Build(dataStream, new SignatureWriter(signatureStream));
 
             // Assert
-            CommonAsserts.ValidateSignature(signatureStream, new XxHashAlgorithm(), Utils.GetMd5(data), new Adler32RollingChecksum());
+            CommonAsserts.ValidateSignature(signatureStream, SupportedAlgorithms.Hashing.XxHash(), Utils.GetMd5(data), new Adler32RollingChecksum());
 
             progressReporter.Received().Report(Arg.Any<ProgressReport>());
         }
@@ -76,7 +76,7 @@ namespace FastRsync.Tests
             target.Build(dataStream, new SignatureWriter(signatureStream));
 
             // Assert
-            CommonAsserts.ValidateSignature(signatureStream, new XxHashAlgorithm(), Utils.GetMd5(data), new Adler32RollingChecksumV2());
+            CommonAsserts.ValidateSignature(signatureStream, SupportedAlgorithms.Hashing.XxHash(), Utils.GetMd5(data), new Adler32RollingChecksumV2());
 
             progressReporter.Received().Report(Arg.Any<ProgressReport>());
         }
@@ -110,7 +110,7 @@ namespace FastRsync.Tests
             target.Build(dataStream, new SignatureWriter(signatureStream));
 
             // Assert
-            CommonAsserts.ValidateSignature(signatureStream, new HashAlgorithmWrapper("SHA1", SHA1.Create()), Utils.GetMd5(data), new Adler32RollingChecksum());
+            CommonAsserts.ValidateSignature(signatureStream, new CryptographyHashAlgorithmWrapper("SHA1", SHA1.Create()), Utils.GetMd5(data), new Adler32RollingChecksum());
 
             progressReporter.Received().Report(Arg.Any<ProgressReport>());
         }

@@ -1,4 +1,5 @@
 using System;
+using System.IO.Hashing;
 using System.Security.Cryptography;
 using FastRsync.Hash;
 
@@ -10,22 +11,22 @@ namespace FastRsync.Core
         {
             public static IHashAlgorithm Sha1()
             {
-                return new HashAlgorithmWrapper("SHA1", SHA1.Create());
+                return new CryptographyHashAlgorithmWrapper("SHA1", SHA1.Create());
             }
 
             public static IHashAlgorithm Md5()
             {
-                return new HashAlgorithmWrapper("MD5", MD5.Create());
+                return new CryptographyHashAlgorithmWrapper("MD5", MD5.Create());
             }
 
             public static IHashAlgorithm XxHash()
             {
-                return new XxHashAlgorithm();
+                return new NonCryptographicHashAlgorithmWrapper("XXH64", new XxHash64());
             }
 
             public static IHashAlgorithm XxHash3()
             {
-                return new XxHash3Algorithm();
+                return new NonCryptographicHashAlgorithmWrapper("XXH3", new XxHash3());
             }
 
             public static IHashAlgorithm Default()
@@ -39,10 +40,10 @@ namespace FastRsync.Core
                 {
                     case "XXH64":
                         return XxHash();
-                    case "XXH3":
-                        return XxHash3();
                     case "MD5":
                         return Md5();
+                    case "XXH3":
+                        return XxHash3();
                     case "SHA1":
                         return Sha1();
                 }
