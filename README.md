@@ -94,10 +94,10 @@ using (var basisStream = await basisBlob.OpenReadAsync())
 
 Following signature hashing algorithms are available:
 
- * XxHash64 - default algorithm, signature size 6.96 MB, signature calculation time 5351 ms
- * SHA1 - signature size 12.9 MB, signature calculation time 6873 ms
- * XxHash3 - signature size 6.96 MB, signature calculation time 5196 ms
- * MD5
+ * XxHash64 - default algorithm, signature size 6.96 MB, signature calculation time 5209 ms
+ * SHA1 - signature size 12.9 MB, signature calculation time 6519 ms
+ * XxHash3 - signature size 6.96 MB, signature calculation time 5024 ms
+ * MD5 - originally used in Rsync program, signature size 10.9 MB, signature calculation time 6767 ms
 
 The signature sizes and calculation times are to provide some insights on relative perfomance. The real perfomance on your system will vary greatly. The benchmark had been run against 0.99 GB file.
 
