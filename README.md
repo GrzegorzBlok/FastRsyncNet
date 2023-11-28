@@ -3,7 +3,7 @@
 The Fast Rsync .NET library is Rsync implementation derived from [Octodiff](https://github.com/OctopusDeploy/Octodiff) tool.
 
 Unlike the Octodiff which is based on SHA1 algorithm, the FastRsyncNet allows a variety of hashing algorithms to choose from.
-The default one, that is xxHash64, offers significant faster calculations and smaller signature size than the SHA1, while still providing sufficient quality of hash results.
+The default one, that is xxHash64, offers significantly faster calculations and smaller signature size than the SHA1, while still providing sufficient quality of hash results.
 
 FastRsyncNet supports also SHA1 and is 100% compatible with signatures and deltas produced by Octodiff.
 
@@ -99,14 +99,15 @@ Following signature hashing algorithms are available:
  * XxHash3 - signature size 6.96 MB, signature calculation time 5196 ms
  * MD5
 
-The signature sizes and calculation times are to provide some insights on relative perfomance. The real perfomance on you system will vary greatly. The benchmark had been run against 0.99 GB file.
+The signature sizes and calculation times are to provide some insights on relative perfomance. The real perfomance on your system will vary greatly. The benchmark had been run against 0.99 GB file.
+
 Following rolling checksum algorithms are available:
 
  * Adler32RollingChecksum - default algorithm, it uses low level optimization that makes it faster but provides worse quality of checksum
  * Adler32RollingChecksumV2 - the original Adler32 algorithm implementation, slower but better quality of checksum 
 
 ## GZip compression that is rsync compatible [![NuGet](https://img.shields.io/nuget/v/FastRsyncNet.Compression.svg?style=flat)](https://www.nuget.org/packages/FastRsyncNet.Compression/)
-If you synchronize compressed file, a small change in a compressed file may force rsync algorithm to synchronize whole compressed file, instead of just the changed blocks. To fix this, a custom GZip compression method may be used that periodically reset the compressor state to make it block-sync friendly. Install [FastRsyncNet.Compression](https://www.nuget.org/packages/FastRsyncNet.Compression/) package and use following method:
+If you synchronize a compressed file, a small change in a compressed file may force rsync algorithm to synchronize whole compressed file, instead of just the changed blocks. To fix this, a custom GZip compression method may be used that periodically reset the compressor state to make it block-sync friendly. Install [FastRsyncNet.Compression](https://www.nuget.org/packages/FastRsyncNet.Compression/) package and use following method:
 ```csharp
 FastRsync.Compression.GZip.Compress(Stream sourceStream, Stream destStream)
 ```
