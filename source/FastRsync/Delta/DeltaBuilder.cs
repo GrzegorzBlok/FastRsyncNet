@@ -23,7 +23,7 @@ namespace FastRsync.Delta
 
         public void BuildDelta(Stream newFileStream, ISignatureReader signatureReader, IDeltaWriter deltaWriter)
         {
-            var newFileVerificationHashAlgorithm = SupportedAlgorithms.Hashing.Md5();
+            var newFileVerificationHashAlgorithm = SupportedAlgorithms.Hashing.XxHash3();
             newFileStream.Seek(0, SeekOrigin.Begin);
             var newFileHash = newFileVerificationHashAlgorithm.ComputeHash(newFileStream);
             newFileStream.Seek(0, SeekOrigin.Begin);
