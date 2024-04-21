@@ -141,7 +141,7 @@ namespace FastRsync.Delta
 
         public async Task BuildDeltaAsync(Stream newFileStream, ISignatureReader signatureReader, IDeltaWriter deltaWriter)
         {
-            var newFileVerificationHashAlgorithm = SupportedAlgorithms.Hashing.Md5();
+            var newFileVerificationHashAlgorithm = SupportedAlgorithms.Hashing.XxHash3();
             newFileStream.Seek(0, SeekOrigin.Begin);
             var newFileHash = await newFileVerificationHashAlgorithm.ComputeHashAsync(newFileStream).ConfigureAwait(false);
             newFileStream.Seek(0, SeekOrigin.Begin);

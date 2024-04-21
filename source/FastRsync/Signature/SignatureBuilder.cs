@@ -97,7 +97,7 @@ namespace FastRsync.Signature
             });
 
             baseFileStream.Seek(0, SeekOrigin.Begin);
-            var baseFileVerificationHashAlgorithm = SupportedAlgorithms.Hashing.Md5();
+            var baseFileVerificationHashAlgorithm = SupportedAlgorithms.Hashing.XxHash3();
             var baseFileHash = await baseFileVerificationHashAlgorithm.ComputeHashAsync(baseFileStream).ConfigureAwait(false);
 
             await signatureWriter.WriteMetadataAsync(new SignatureMetadata
