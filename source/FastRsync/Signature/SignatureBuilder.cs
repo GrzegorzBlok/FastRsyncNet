@@ -68,7 +68,7 @@ namespace FastRsync.Signature
             });
 
             baseFileStream.Seek(0, SeekOrigin.Begin);
-            var baseFileVerificationHashAlgorithm = SupportedAlgorithms.Hashing.Md5();
+            var baseFileVerificationHashAlgorithm = SupportedAlgorithms.Hashing.XxHash3();
             var baseFileHash = baseFileVerificationHashAlgorithm.ComputeHash(baseFileStream);
 
             signatureWriter.WriteMetadata(new SignatureMetadata
