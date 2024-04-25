@@ -68,14 +68,13 @@ namespace FastRsync.Signature
             });
 
             baseFileStream.Seek(0, SeekOrigin.Begin);
-            var baseFileVerificationHashAlgorithm = SupportedAlgorithms.Hashing.XxHash3();
-            var baseFileHash = baseFileVerificationHashAlgorithm.ComputeHash(baseFileStream);
+            var baseFileHash = HashAlgorithm.ComputeHash(baseFileStream);
 
             signatureWriter.WriteMetadata(new SignatureMetadata
             {
                 ChunkHashAlgorithm = HashAlgorithm.Name,
                 RollingChecksumAlgorithm = RollingChecksumAlgorithm.Name,
-                BaseFileHashAlgorithm = baseFileVerificationHashAlgorithm.Name,
+                BaseFileHashAlgorithm = HashAlgorithm.Name,
                 BaseFileHash = Convert.ToBase64String(baseFileHash)
             });
 
@@ -97,14 +96,13 @@ namespace FastRsync.Signature
             });
 
             baseFileStream.Seek(0, SeekOrigin.Begin);
-            var baseFileVerificationHashAlgorithm = SupportedAlgorithms.Hashing.XxHash3();
-            var baseFileHash = await baseFileVerificationHashAlgorithm.ComputeHashAsync(baseFileStream).ConfigureAwait(false);
+            var baseFileHash = await HashAlgorithm.ComputeHashAsync(baseFileStream).ConfigureAwait(false);
 
             await signatureWriter.WriteMetadataAsync(new SignatureMetadata
             {
                 ChunkHashAlgorithm = HashAlgorithm.Name,
                 RollingChecksumAlgorithm = RollingChecksumAlgorithm.Name,
-                BaseFileHashAlgorithm = baseFileVerificationHashAlgorithm.Name,
+                BaseFileHashAlgorithm = HashAlgorithm.Name,
                 BaseFileHash = Convert.ToBase64String(baseFileHash)
             }).ConfigureAwait(false);
 
