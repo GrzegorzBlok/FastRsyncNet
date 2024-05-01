@@ -174,3 +174,4 @@ UpgradeLog*.htm
 FakesAssemblies/
 /.vs
 /source/.vs/FastRsync/v15/Server/sqlite3
+/source/.vs
