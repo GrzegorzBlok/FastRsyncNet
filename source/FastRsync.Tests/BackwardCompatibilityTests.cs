@@ -7,6 +7,7 @@ using FastRsync.Delta;
 using FastRsync.Diagnostics;
 using FastRsync.Signature;
 using NSubstitute;
+using NUnit.Framework.Legacy;
 
 namespace FastRsync.Tests
 {

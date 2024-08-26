@@ -4,6 +4,7 @@ using System.IO;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
 using Octodiff.Tests.Util;
+using NUnit.Framework.Legacy;
 
 namespace Octodiff.Tests
 {
@@ -62,8 +63,8 @@ namespace Octodiff.Tests
             var actualDifference = Math.Abs(newSize - originalSize);
             var deltaToActualRatio = (double) deltaSize/actualDifference;
             Trace.WriteLine(string.Format("Delta ratio: {0:n3}", deltaToActualRatio));
-            Assert.IsTrue(deltaSize * 2 < newSize, "Delta should be at least half the new file size");
-            Assert.IsTrue(0.80 <= deltaToActualRatio && deltaToActualRatio <= 1.60, "Delta should be pretty close to the actual file differences");
+            Assert.That(deltaSize * 2 < newSize, Is.True, "Delta should be at least half the new file size");
+            Assert.That(0.80 <= deltaToActualRatio && deltaToActualRatio <= 1.60, Is.True, "Delta should be pretty close to the actual file differences");
         }
     }
 }

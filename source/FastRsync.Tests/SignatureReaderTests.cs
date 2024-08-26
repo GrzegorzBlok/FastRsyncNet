@@ -27,10 +27,10 @@ namespace FastRsync.Tests
 
             // Assert
             var hashAlgorithm = SupportedAlgorithms.Hashing.Default();
-            Assert.AreEqual(RsyncFormatType.Octodiff, target.Type);
-            Assert.AreEqual(hashAlgorithm.Name, target.HashAlgorithm.Name);
-            Assert.AreEqual(hashAlgorithm.HashLengthInBytes, target.HashAlgorithm.HashLengthInBytes);
-            Assert.AreEqual(new Adler32RollingChecksum().Name, target.RollingChecksumAlgorithm.Name);
+            Assert.That(target.Type, Is.EqualTo(RsyncFormatType.Octodiff) );
+            Assert.That(target.HashAlgorithm.Name, Is.EqualTo(hashAlgorithm.Name));
+            Assert.That(target.HashAlgorithm.HashLengthInBytes, Is.EqualTo(hashAlgorithm.HashLengthInBytes));
+            Assert.That(target.RollingChecksumAlgorithm.Name, Is.EqualTo(new Adler32RollingChecksum().Name));
 
             progressReporter.Received().Report(Arg.Any<ProgressReport>());
         }

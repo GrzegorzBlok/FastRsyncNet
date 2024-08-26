@@ -8,6 +8,7 @@ using FastRsync.Signature;
 using NSubstitute;
 using NUnit.Framework;
 using System.Security.Cryptography;
+using NUnit.Framework.Legacy;
 
 namespace FastRsync.Tests
 {
@@ -44,8 +45,8 @@ namespace FastRsync.Tests
                 }
 
                 // Assert
-                Assert.AreEqual(new FileInfo(newFileName).Length, new FileInfo(patchedFileName).Length);
-                Assert.True(CompareFilesByHash(newFileName, patchedFileName));
+                Assert.That(new FileInfo(newFileName).Length, Is.EqualTo(new FileInfo(patchedFileName).Length));
+                Assert.That(CompareFilesByHash(newFileName, patchedFileName), Is.True);
                 progressReporter.Received().Report(Arg.Any<ProgressReport>());
             }
             catch (Exception e)

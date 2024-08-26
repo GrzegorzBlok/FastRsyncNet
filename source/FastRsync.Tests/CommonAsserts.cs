@@ -11,14 +11,14 @@ namespace FastRsync.Tests
         {
             signatureStream.Seek(0, SeekOrigin.Begin);
             var sig = new SignatureReader(signatureStream, null).ReadSignature();
-            Assert.AreEqual(RsyncFormatType.FastRsync, sig.Type);
-            Assert.AreEqual(hashAlgorithm.Name, sig.HashAlgorithm.Name);
-            Assert.AreEqual(hashAlgorithm.Name, sig.Metadata.ChunkHashAlgorithm);
-            Assert.AreEqual(hashAlgorithm.HashLengthInBytes, sig.HashAlgorithm.HashLengthInBytes);
-            Assert.AreEqual(rollingAlgorithm.Name, sig.RollingChecksumAlgorithm.Name);
-            Assert.AreEqual(rollingAlgorithm.Name, sig.Metadata.RollingChecksumAlgorithm);
-            Assert.AreEqual("MD5", sig.Metadata.BaseFileHashAlgorithm);
-            Assert.AreEqual(baseFileHash, sig.Metadata.BaseFileHash);
+            Assert.That(sig.Type, Is.EqualTo(RsyncFormatType.FastRsync));
+            Assert.That(sig.HashAlgorithm.Name, Is.EqualTo(hashAlgorithm.Name));
+            Assert.That(sig.Metadata.ChunkHashAlgorithm, Is.EqualTo(hashAlgorithm.Name));
+            Assert.That(sig.HashAlgorithm.HashLengthInBytes, Is.EqualTo(hashAlgorithm.HashLengthInBytes));
+            Assert.That(sig.RollingChecksumAlgorithm.Name, Is.EqualTo(rollingAlgorithm.Name));
+            Assert.That(sig.Metadata.RollingChecksumAlgorithm, Is.EqualTo(rollingAlgorithm.Name));
+            Assert.That(sig.Metadata.BaseFileHashAlgorithm, Is.EqualTo("MD5"));
+            Assert.That(sig.Metadata.BaseFileHash, Is.EqualTo(baseFileHash));
         }
     }
 }

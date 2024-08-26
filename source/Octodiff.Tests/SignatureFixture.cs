@@ -29,7 +29,7 @@ namespace Octodiff.Tests
             Trace.WriteLine(string.Format("Basis size: {0:n0}", basisSize));
             Trace.WriteLine(string.Format("Signature size: {0:n0}", signatureSize));
             Trace.WriteLine(string.Format("Signature ratio: {0:n3}", signatureSizePercentageOfBasis));
-            Assert.IsTrue(0.006 <= signatureSizePercentageOfBasis && signatureSizePercentageOfBasis <= 0.014);
+            Assert.That(0.006 <= signatureSizePercentageOfBasis && signatureSizePercentageOfBasis <= 0.014, Is.True);
         }
 
         [Test]

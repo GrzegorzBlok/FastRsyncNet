@@ -9,6 +9,7 @@ using FastRsync.Signature;
 using FastRsync.Tests.OctodiffLegacy;
 using NSubstitute;
 using NUnit.Framework;
+using NUnit.Framework.Legacy;
 
 namespace FastRsync.Tests
 {

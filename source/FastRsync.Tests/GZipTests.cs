@@ -37,7 +37,7 @@ namespace FastRsync.Tests
             var destStream = CompressData(data);
 
             // Additional asserts
-            Assert.AreEqual(6982738, destStream.Length);
+            Assert.That(destStream.Length, Is.EqualTo(6982738));
         }
 
         private static MemoryStream CompressData(byte[] data)
@@ -58,7 +58,7 @@ namespace FastRsync.Tests
             }
 
             var dataOutput = decompressedStream.ToArray();
-            Assert.AreEqual(data, dataOutput);
+            Assert.That(dataOutput, Is.EqualTo(data));
             return destStream;
         }
 
@@ -98,7 +98,7 @@ namespace FastRsync.Tests
             var deltaStream = FullCompressedRsyncFlow(basisStream, newFileStream);
 
             // Not calculated, taken from the valid flow
-            Assert.AreEqual(662628, deltaStream.Length);
+            Assert.That(deltaStream.Length, Is.EqualTo(662628));
         }
 
         private static MemoryStream FullCompressedRsyncFlow(MemoryStream basisStream, MemoryStream newFileStream)
@@ -135,7 +135,7 @@ namespace FastRsync.Tests
             deltaApplier.HashCheck(deltaReader, patchedCompressedStream);
 
             // Assert
-            Assert.AreEqual(newFileStreamCompressed.ToArray(), patchedCompressedStream.ToArray());
+            Assert.That(newFileStreamCompressed.ToArray(), Is.EqualTo(patchedCompressedStream.ToArray()));
 
             patchedCompressedStream.Seek(0, SeekOrigin.Begin);
             var decompressedStream = new MemoryStream();
@@ -145,7 +145,7 @@ namespace FastRsync.Tests
             }
 
             var dataOutput = decompressedStream.ToArray();
-            Assert.AreEqual(newFileStream.ToArray(), dataOutput);
+            Assert.That(dataOutput, Is.EqualTo(newFileStream.ToArray()));
             return deltaStream;
         }
 
@@ -185,7 +185,7 @@ namespace FastRsync.Tests
             var deltaStream = await FullCompressedRsyncFlowAsync(basisStream, newFileStream);
 
             // Not calculated, taken from the valid flow
-            Assert.AreEqual(662628, deltaStream.Length);
+            Assert.That(deltaStream.Length, Is.EqualTo(662628));
         }
 
         private static async Task<MemoryStream> FullCompressedRsyncFlowAsync(MemoryStream basisStream, MemoryStream newFileStream)
@@ -224,7 +224,7 @@ namespace FastRsync.Tests
             await deltaApplier.HashCheckAsync(deltaReader, patchedCompressedStream);
 
             // Assert
-            Assert.AreEqual(newFileStreamCompressed.ToArray(), patchedCompressedStream.ToArray());
+            Assert.That(newFileStreamCompressed.ToArray(), Is.EqualTo(patchedCompressedStream.ToArray()));
 
             patchedCompressedStream.Seek(0, SeekOrigin.Begin);
             var decompressedStream = new MemoryStream();
@@ -233,7 +233,7 @@ namespace FastRsync.Tests
                 await gz.CopyToAsync(decompressedStream);
             }
 
-            Assert.AreEqual(newFileStream.ToArray(), decompressedStream.ToArray());
+            Assert.That(newFileStream.ToArray(), Is.EqualTo(decompressedStream.ToArray()));
             return deltaStream;
         }
     }

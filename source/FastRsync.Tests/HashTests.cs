@@ -35,7 +35,7 @@ public class HashTests
         Array.Reverse(systemXxHash64Dest);
 
         // Assert
-        Assert.AreEqual(dataXxHash64Dest, systemXxHash64Dest);
+        Assert.That(systemXxHash64Dest, Is.EqualTo(dataXxHash64Dest));
     }
 
     [Test]
@@ -65,7 +65,7 @@ public class HashTests
         Array.Reverse(systemXxHash64Dest);
 
         // Assert
-        Assert.AreEqual(dataXxHash64Dest, systemXxHash64Dest);
+        Assert.That(systemXxHash64Dest, Is.EqualTo(dataXxHash64Dest));
     }
 
     [Test]
@@ -104,7 +104,7 @@ public class HashTests
         Array.Reverse(systemXxHash64Dest);
 
         // Assert
-        Assert.AreEqual(dataXxHash64Dest, systemXxHash64Dest);
+        Assert.That(systemXxHash64Dest, Is.EqualTo(dataXxHash64Dest));
     }
 }
 

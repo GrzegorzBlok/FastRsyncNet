@@ -39,14 +39,14 @@ namespace FastRsync.Tests
 
             // Assert
             var hashAlgorithm = SupportedAlgorithms.Hashing.Default();
-            Assert.AreEqual(RsyncFormatType.FastRsync, target.Type);
-            Assert.AreEqual(hashAlgorithm.Name, target.HashAlgorithm.Name);
-            Assert.AreEqual(hashAlgorithm.HashLengthInBytes, target.HashAlgorithm.HashLengthInBytes);
-            Assert.AreEqual(FastRsyncLegacyDeltaExpectedFileHash, target.Metadata.ExpectedFileHash);
-            Assert.AreEqual("MD5", target.Metadata.ExpectedFileHashAlgorithm);
-            Assert.AreEqual(hashAlgorithm.Name, target.Metadata.HashAlgorithm);
-            Assert.Null(target.Metadata.BaseFileHash);
-            Assert.Null(target.Metadata.BaseFileHashAlgorithm);
+            Assert.That(target.Type, Is.EqualTo(RsyncFormatType.FastRsync));
+            Assert.That(target.HashAlgorithm.Name, Is.EqualTo(hashAlgorithm.Name));
+            Assert.That(target.HashAlgorithm.HashLengthInBytes, Is.EqualTo(hashAlgorithm.HashLengthInBytes));
+            Assert.That(target.Metadata.ExpectedFileHash, Is.EqualTo(FastRsyncLegacyDeltaExpectedFileHash));
+            Assert.That(target.Metadata.ExpectedFileHashAlgorithm, Is.EqualTo("MD5"));
+            Assert.That(target.Metadata.HashAlgorithm, Is.EqualTo(hashAlgorithm.Name));
+            Assert.That(target.Metadata.BaseFileHash, Is.Null);
+            Assert.That(target.Metadata.BaseFileHashAlgorithm, Is.Null);
         }
 
         [Test]
@@ -65,12 +65,12 @@ namespace FastRsync.Tests
 
             // Assert
             var hashAlgorithm = SupportedAlgorithms.Hashing.Default();
-            Assert.AreEqual(hashAlgorithm.Name, target.HashAlgorithm.Name);
-            Assert.AreEqual(hashAlgorithm.HashLengthInBytes, target.HashAlgorithm.HashLengthInBytes);
-            Assert.AreEqual(RsyncFormatType.FastRsync, target.Type); 
-            Assert.IsNotEmpty(target.Metadata.ExpectedFileHash);
-            Assert.AreEqual("MD5", target.Metadata.ExpectedFileHashAlgorithm);
-            Assert.AreEqual(hashAlgorithm.Name, target.Metadata.HashAlgorithm);
+            Assert.That(target.HashAlgorithm.Name, Is.EqualTo(hashAlgorithm.Name));
+            Assert.That(target.HashAlgorithm.HashLengthInBytes, Is.EqualTo(hashAlgorithm.HashLengthInBytes));
+            Assert.That(target.Type, Is.EqualTo(RsyncFormatType.FastRsync));
+            Assert.That(target.Metadata.ExpectedFileHash, Is.Not.Null.And.Not.Empty);
+            Assert.That(target.Metadata.ExpectedFileHashAlgorithm, Is.EqualTo("MD5"));
+            Assert.That(target.Metadata.HashAlgorithm, Is.EqualTo(hashAlgorithm.Name));
         }
     }
 }

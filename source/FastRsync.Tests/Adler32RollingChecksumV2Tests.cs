@@ -23,10 +23,10 @@ namespace FastRsync.Tests
             var checksum4 = new Adler32RollingChecksumV2().Calculate(data4, 0, data4.Length);
 
             // Assert
-            Assert.AreEqual(0x4ff907a1, checksum1);
-            Assert.AreEqual(0x5206079b, checksum2);
-            Assert.AreEqual(0x040f0fc1, checksum3);
-            Assert.AreEqual(0x2d10357d, checksum4);
+            Assert.That(checksum1, Is.EqualTo(0x4ff907a1));
+            Assert.That(checksum2, Is.EqualTo(0x5206079b));
+            Assert.That(checksum3, Is.EqualTo(0x040f0fc1));
+            Assert.That(checksum4, Is.EqualTo(0x2d10357d));
         }
     }
 }

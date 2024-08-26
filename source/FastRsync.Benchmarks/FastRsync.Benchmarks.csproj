@@ -6,8 +6,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Azure.Storage.Blobs" Version="12.19.1" />
-    <PackageReference Include="BenchmarkDotNet" Version="0.13.10" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.21.2" />
+    <PackageReference Include="BenchmarkDotNet" Version="0.14.0" />
     <PackageReference Include="System.IO.Hashing" Version="8.0.0" />
     <PackageReference Include="System.Data.HashFunction.Core" Version="2.0.0" />
     <PackageReference Include="System.Data.HashFunction.Interfaces" Version="2.0.0" />
