@@ -79,10 +79,11 @@ public class HashTests
         new Random().NextBytes(data);
         var streamdata = new MemoryStream(data);
 
-        const string azureBlobStorageConnectionString = "PUT AZURE BLOB STORAGE CONNECTION STRING HERE";
+        const string azureBlobStorageConnectionString = "UseDevelopmentStorage=true;";
 
         var azureBlobServiceClient = new BlobServiceClient(azureBlobStorageConnectionString);
         var azureBlobContainerClient = azureBlobServiceClient.GetBlobContainerClient("hashbenchmark");
+        await azureBlobContainerClient.CreateIfNotExistsAsync();
         var azureBlob = azureBlobContainerClient.GetBlockBlobClient("XxHash64StreamBackwardCompatibility_" + dataLength);
         await azureBlob.UploadAsync(streamdata);
 
