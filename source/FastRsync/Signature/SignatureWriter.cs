@@ -1,5 +1,6 @@
 ﻿using System.IO;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using FastRsync.Core;
 
@@ -7,12 +8,12 @@ namespace FastRsync.Signature
 {
     public class SignatureWriter : ISignatureWriter
     {
-        private readonly Stream _signatureStream;
+        private readonly Stream signatureStream;
         private readonly BinaryWriter signaturebw;
 
         public SignatureWriter(Stream signatureStream)
         {
-            _signatureStream = signatureStream;
+            this.signatureStream = signatureStream;
             signaturebw = new BinaryWriter(signatureStream);
         }
 
@@ -29,13 +30,17 @@ namespace FastRsync.Signature
             WriteMetadataInternal(signaturebw, metadata);
         }
 
-        public async Task WriteMetadataAsync(SignatureMetadata metadata)
+        public async Task WriteMetadataAsync(SignatureMetadata metadata, CancellationToken cancellationToken)
         {
             var ms = new MemoryStream(256);
             var msbw = new BinaryWriter(ms);
             WriteMetadataInternal(msbw, metadata);
             ms.Seek(0, SeekOrigin.Begin);
-            await ms.CopyToAsync(_signatureStream).ConfigureAwait(false);
+#if (NET5_0_OR_GREATER)
+            await ms.CopyToAsync(signatureStream, cancellationToken).ConfigureAwait(false);
+#else
+            await ms.CopyToAsync(signatureStream).ConfigureAwait(false);
+#endif
         }
 
         public void WriteChunk(ChunkSignature signature)
@@ -45,11 +50,11 @@ namespace FastRsync.Signature
             signaturebw.Write(signature.Hash);
         }
 
-        public async Task WriteChunkAsync(ChunkSignature signature)
+        public async Task WriteChunkAsync(ChunkSignature signature, CancellationToken cancellationToken)
         {
             signaturebw.Write(signature.Length);
             signaturebw.Write(signature.RollingChecksum);
-            await _signatureStream.WriteAsync(signature.Hash, 0, signature.Hash.Length).ConfigureAwait(false);
+            await signatureStream.WriteAsync(signature.Hash, 0, signature.Hash.Length, cancellationToken).ConfigureAwait(false);
         }
     }
 }

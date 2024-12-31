@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.IO;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using FastRsync.Core;
 using FastRsync.Diagnostics;
@@ -167,9 +168,9 @@ namespace FastRsync.Delta
             }
         }
 
-        public async Task ApplyAsync(
-            Func<byte[], Task> writeData,
-            Func<long, long, Task> copy)
+        public Task ApplyAsync(Func<byte[], Task> writeData, Func<long, long, Task> copy) => ApplyAsync(writeData, copy, CancellationToken.None);
+
+        public async Task ApplyAsync(Func<byte[], Task> writeData, Func<long, long, Task> copy, CancellationToken cancellationToken)
         {
             var fileLength = reader.BaseStream.Length;
 
@@ -200,7 +201,7 @@ namespace FastRsync.Delta
                     long soFar = 0;
                     while (soFar < length)
                     {
-                        var bytesRead = await reader.BaseStream.ReadAsync(buffer, 0, (int) Math.Min(length - soFar, buffer.Length)).ConfigureAwait(false);
+                        var bytesRead = await reader.BaseStream.ReadAsync(buffer, 0, (int) Math.Min(length - soFar, buffer.Length), cancellationToken).ConfigureAwait(false);
                         var bytes = buffer;
                         if (bytesRead != buffer.Length)
                         {

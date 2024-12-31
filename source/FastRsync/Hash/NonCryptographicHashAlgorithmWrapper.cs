@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO.Hashing;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace FastRsync.Hash
@@ -28,9 +29,9 @@ namespace FastRsync.Hash
             return hash;
         }
 
-        public async Task<byte[]> ComputeHashAsync(Stream stream)
+        public async Task<byte[]> ComputeHashAsync(Stream stream, CancellationToken cancellationToken = default)
         {
-            await algorithm.AppendAsync(stream).ConfigureAwait(false);
+            await algorithm.AppendAsync(stream, cancellationToken).ConfigureAwait(false);
             var hash = algorithm.GetHashAndReset();
             Array.Reverse(hash);
 
@@ -39,8 +40,7 @@ namespace FastRsync.Hash
 
         public byte[] ComputeHash(byte[] buffer, int offset, int length)
         {
-            byte[] data = new byte[length];
-            Buffer.BlockCopy(buffer, offset, data, 0, length);
+            var data = buffer.AsSpan(offset, length);
             algorithm.Append(data);
             var hash = algorithm.GetHashAndReset();
             Array.Reverse(hash);

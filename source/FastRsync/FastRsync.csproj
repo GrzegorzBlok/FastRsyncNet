@@ -4,12 +4,17 @@
     <PackageId>FastRsyncNet</PackageId>
     <Authors>Grzegorz Blok</Authors>
     <PackageProjectUrl>https://github.com/GrzegorzBlok/FastRsyncNet</PackageProjectUrl>
-    <PackageTags>sync rsync synchronization</PackageTags>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
-    <AssemblyVersion>2.4.2</AssemblyVersion>
-    <FileVersion>2.4.2</FileVersion>
-    <Version>2.4.2</Version>
+    <AssemblyVersion>2.4.3</AssemblyVersion>
+    <FileVersion>2.4.3</FileVersion>
+    <Version>2.4.3</Version>
+    <PackageTags>sync;rsync;synchronization</PackageTags>
+    <Description>
+      .NET library for file synchronization based on Rsync algorithm. Optimized for speed and data size to achieve best network performance.
+
+      You may also want to check [FastRsyncNet.Compression](https://www.nuget.org/packages/FastRsyncNet.Compression).
+    </Description>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -31,6 +36,7 @@
   <ItemGroup>
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
     <PackageReference Include="System.IO.Hashing" Version="8.0.0" />
+    <PackageReference Include="System.Memory" Version="4.6.0" Condition="'$(TargetFramework)' != 'net7.0'" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Properties\" />

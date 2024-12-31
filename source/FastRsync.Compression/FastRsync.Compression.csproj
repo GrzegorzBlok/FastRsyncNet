@@ -9,16 +9,20 @@
     <Product></Product>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <Copyright></Copyright>
-    <Description>.NET library for file compression compatible with Rsync algorithm.</Description>
+    <Description>
+      .NET library for file compression compatible with Rsync algorithm.
+
+      You may also want to check [FastRsyncNet](https://www.nuget.org/packages/FastRsyncNet).
+    </Description>
     <PackageProjectUrl>https://github.com/GrzegorzBlok/FastRsyncNet</PackageProjectUrl>
-    <PackageTags>sync rsync synchronization compression</PackageTags>
-    <AssemblyVersion>1.1.1</AssemblyVersion>
-    <FileVersion>1.1.1</FileVersion>
-    <Version>1.1.1</Version>
+    <PackageTags>sync;rsync;synchronization;compression</PackageTags>
+    <AssemblyVersion>1.1.2</AssemblyVersion>
+    <FileVersion>1.1.2</FileVersion>
+    <Version>1.1.2</Version>
 </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="ProDotNetZip" Version="1.19.0" />
+    <PackageReference Include="ProDotNetZip" Version="1.20.0" />
   </ItemGroup>
 
 </Project>

@@ -1,4 +1,5 @@
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using FastRsync.Delta;
 
@@ -28,10 +29,10 @@ namespace FastRsync.Core
             decorated.WriteDataCommand(source, offset, length);
         }
 
-        public async Task WriteDataCommandAsync(Stream source, long offset, long length)
+        public async Task WriteDataCommandAsync(Stream source, long offset, long length, CancellationToken cancellationToken)
         {
             FlushCurrentCopyCommand();
-            await decorated.WriteDataCommandAsync(source, offset, length).ConfigureAwait(false);
+            await decorated.WriteDataCommandAsync(source, offset, length, cancellationToken).ConfigureAwait(false);
         }
 
         public void WriteMetadata(DeltaMetadata metadata)

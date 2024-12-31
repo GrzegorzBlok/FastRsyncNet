@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using FastRsync.Core;
 
@@ -60,7 +61,7 @@ namespace FastRsync.Delta
             }
         }
 
-        public async Task WriteDataCommandAsync(Stream source, long offset, long length)
+        public async Task WriteDataCommandAsync(Stream source, long offset, long length, CancellationToken cancellationToken)
         {
             writer.Write(BinaryFormat.DataCommand);
             writer.Write(length);
@@ -74,10 +75,10 @@ namespace FastRsync.Delta
 
                 int read;
                 long soFar = 0;
-                while ((read = await source.ReadAsync(buffer, 0, (int)Math.Min(length - soFar, buffer.Length)).ConfigureAwait(false)) > 0)
+                while ((read = await source.ReadAsync(buffer, 0, (int)Math.Min(length - soFar, buffer.Length), cancellationToken).ConfigureAwait(false)) > 0)
                 {
                     soFar += read;
-                    await deltaStream.WriteAsync(buffer, 0, read).ConfigureAwait(false);
+                    await deltaStream.WriteAsync(buffer, 0, read, cancellationToken).ConfigureAwait(false);
                 }
             }
             finally

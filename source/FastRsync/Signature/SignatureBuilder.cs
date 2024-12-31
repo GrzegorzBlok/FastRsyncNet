@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using FastRsync.Core;
 using FastRsync.Diagnostics;
@@ -52,10 +53,13 @@ namespace FastRsync.Signature
             WriteChunkSignatures(baseDataStream, signatureWriter);
         }
 
-        public async Task BuildAsync(Stream baseDataStream, ISignatureWriter signatureWriter)
+        public Task BuildAsync(Stream baseDataStream, ISignatureWriter signatureWriter) =>
+            BuildAsync(baseDataStream, signatureWriter, CancellationToken.None);
+
+        public async Task BuildAsync(Stream baseDataStream, ISignatureWriter signatureWriter, CancellationToken cancellationToken)
         {
-            await WriteMetadataAsync(baseDataStream, signatureWriter).ConfigureAwait(false);
-            await WriteChunkSignaturesAsync(baseDataStream, signatureWriter).ConfigureAwait(false);
+            await WriteMetadataAsync(baseDataStream, signatureWriter, cancellationToken).ConfigureAwait(false);
+            await WriteChunkSignaturesAsync(baseDataStream, signatureWriter, cancellationToken).ConfigureAwait(false);
         }
 
         private void WriteMetadata(Stream baseFileStream, ISignatureWriter signatureWriter)
@@ -87,7 +91,7 @@ namespace FastRsync.Signature
             });
         }
 
-        private async Task WriteMetadataAsync(Stream baseFileStream, ISignatureWriter signatureWriter)
+        private async Task WriteMetadataAsync(Stream baseFileStream, ISignatureWriter signatureWriter, CancellationToken cancellationToken)
         {
             ProgressReport?.Report(new ProgressReport
             {
@@ -98,7 +102,7 @@ namespace FastRsync.Signature
 
             baseFileStream.Seek(0, SeekOrigin.Begin);
             var baseFileVerificationHashAlgorithm = SupportedAlgorithms.Hashing.Md5();
-            var baseFileHash = await baseFileVerificationHashAlgorithm.ComputeHashAsync(baseFileStream).ConfigureAwait(false);
+            var baseFileHash = await baseFileVerificationHashAlgorithm.ComputeHashAsync(baseFileStream, cancellationToken).ConfigureAwait(false);
 
             await signatureWriter.WriteMetadataAsync(new SignatureMetadata
             {
@@ -106,7 +110,7 @@ namespace FastRsync.Signature
                 RollingChecksumAlgorithm = RollingChecksumAlgorithm.Name,
                 BaseFileHashAlgorithm = baseFileVerificationHashAlgorithm.Name,
                 BaseFileHash = Convert.ToBase64String(baseFileHash)
-            }).ConfigureAwait(false);
+            }, cancellationToken).ConfigureAwait(false);
 
             ProgressReport?.Report(new ProgressReport
             {
@@ -152,7 +156,7 @@ namespace FastRsync.Signature
             }
         }
 
-        private async Task WriteChunkSignaturesAsync(Stream baseFileStream, ISignatureWriter signatureWriter)
+        private async Task WriteChunkSignaturesAsync(Stream baseFileStream, ISignatureWriter signatureWriter, CancellationToken cancellationToken)
         {
             var checksumAlgorithm = RollingChecksumAlgorithm;
             var hashAlgorithm = HashAlgorithm;
@@ -168,7 +172,7 @@ namespace FastRsync.Signature
             long start = 0;
             int read;
             var block = new byte[ChunkSize];
-            while ((read = await baseFileStream.ReadAsync(block, 0, block.Length).ConfigureAwait(false)) > 0)
+            while ((read = await baseFileStream.ReadAsync(block, 0, block.Length, cancellationToken).ConfigureAwait(false)) > 0)
             {
                 await signatureWriter.WriteChunkAsync(new ChunkSignature
                 {
@@ -176,7 +180,7 @@ namespace FastRsync.Signature
                     Length = (short)read,
                     Hash = hashAlgorithm.ComputeHash(block, 0, read),
                     RollingChecksum = checksumAlgorithm.Calculate(block, 0, read)
-                }).ConfigureAwait(false);
+                }, cancellationToken).ConfigureAwait(false);
 
                 start += read;
                 ProgressReport?.Report(new ProgressReport

@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using FastRsync.Core;
 using FastRsync.Diagnostics;
@@ -96,10 +97,8 @@ namespace FastRsync.Delta
                     if (readSoFar - (lastMatchPosition - remainingPossibleChunkSize) < remainingPossibleChunkSize)
                         continue;
 
-                    if (!chunkMap.ContainsKey(checksum)) 
+                    if (!chunkMap.TryGetValue(checksum, out var startIndex)) 
                         continue;
-
-                    var startIndex = chunkMap[checksum];
 
                     for (var j = startIndex; j < chunks.Count && chunks[j].RollingChecksum == checksum; j++)
                     {
@@ -108,7 +107,7 @@ namespace FastRsync.Delta
 
                         if (StructuralComparisons.StructuralEqualityComparer.Equals(hash, chunks[j].Hash))
                         {
-                            readSoFar = readSoFar + remainingPossibleChunkSize;
+                            readSoFar += remainingPossibleChunkSize;
 
                             var missing = readSoFar - lastMatchPosition;
                             if (missing > remainingPossibleChunkSize)
@@ -139,11 +138,14 @@ namespace FastRsync.Delta
             deltaWriter.Finish();
         }
 
-        public async Task BuildDeltaAsync(Stream newFileStream, ISignatureReader signatureReader, IDeltaWriter deltaWriter)
+        public Task BuildDeltaAsync(Stream newFileStream, ISignatureReader signatureReader, IDeltaWriter deltaWriter) =>
+            BuildDeltaAsync(newFileStream, signatureReader, deltaWriter, CancellationToken.None);
+
+        public async Task BuildDeltaAsync(Stream newFileStream, ISignatureReader signatureReader, IDeltaWriter deltaWriter, CancellationToken cancellationToken)
         {
             var newFileVerificationHashAlgorithm = SupportedAlgorithms.Hashing.Md5();
             newFileStream.Seek(0, SeekOrigin.Begin);
-            var newFileHash = await newFileVerificationHashAlgorithm.ComputeHashAsync(newFileStream).ConfigureAwait(false);
+            var newFileHash = await newFileVerificationHashAlgorithm.ComputeHashAsync(newFileStream, cancellationToken).ConfigureAwait(false);
             newFileStream.Seek(0, SeekOrigin.Begin);
 
             var signature = signatureReader.ReadSignature();
@@ -175,7 +177,7 @@ namespace FastRsync.Delta
             while (true)
             {
                 var startPosition = newFileStream.Position;
-                var read = await newFileStream.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
+                var read = await newFileStream.ReadAsync(buffer, 0, buffer.Length, cancellationToken).ConfigureAwait(false);
                 if (read < 0)
                     break;
 
@@ -214,10 +216,8 @@ namespace FastRsync.Delta
                     if (readSoFar - (lastMatchPosition - remainingPossibleChunkSize) < remainingPossibleChunkSize)
                         continue;
 
-                    if (!chunkMap.ContainsKey(checksum))
+                    if (!chunkMap.TryGetValue(checksum, out var startIndex))
                         continue;
-
-                    var startIndex = chunkMap[checksum];
 
                     for (var j = startIndex; j < chunks.Count && chunks[j].RollingChecksum == checksum; j++)
                     {
@@ -226,12 +226,12 @@ namespace FastRsync.Delta
 
                         if (StructuralComparisons.StructuralEqualityComparer.Equals(hash, chunks[j].Hash))
                         {
-                            readSoFar = readSoFar + remainingPossibleChunkSize;
+                            readSoFar += remainingPossibleChunkSize;
 
                             var missing = readSoFar - lastMatchPosition;
                             if (missing > remainingPossibleChunkSize)
                             {
-                                await deltaWriter.WriteDataCommandAsync(newFileStream, lastMatchPosition, missing - remainingPossibleChunkSize).ConfigureAwait(false);
+                                await deltaWriter.WriteDataCommandAsync(newFileStream, lastMatchPosition, missing - remainingPossibleChunkSize, cancellationToken).ConfigureAwait(false);
                             }
 
                             deltaWriter.WriteCopyCommand(new DataRange(chunk.StartOffset, chunk.Length));
@@ -251,7 +251,7 @@ namespace FastRsync.Delta
 
             if (newFileStream.Length != lastMatchPosition)
             {
-                await deltaWriter.WriteDataCommandAsync(newFileStream, lastMatchPosition, newFileStream.Length - lastMatchPosition).ConfigureAwait(false);
+                await deltaWriter.WriteDataCommandAsync(newFileStream, lastMatchPosition, newFileStream.Length - lastMatchPosition, cancellationToken).ConfigureAwait(false);
             }
 
             deltaWriter.Finish();
