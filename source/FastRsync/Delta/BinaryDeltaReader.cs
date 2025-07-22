@@ -19,7 +19,8 @@ namespace FastRsync.Delta
         private IHashAlgorithm hashAlgorithm;
         private readonly int readBufferSize;
 
-        public BinaryDeltaReader(Stream stream, IProgress<ProgressReport> progressHandler, int readBufferSize = 4 * 1024 * 1024)
+        public BinaryDeltaReader(Stream stream, IProgress<ProgressReport> progressHandler,
+            int readBufferSize = 4 * 1024 * 1024)
         {
             this.reader = new BinaryReader(stream);
             this.progressReport = progressHandler;
@@ -86,7 +87,7 @@ namespace FastRsync.Delta
                 return;
             }
 
-            throw new InvalidDataException("The delta file uses a different file format than this program can handle."); 
+            throw new InvalidDataException("The delta file uses a different file format than this program can handle.");
         }
 
         private void ReadFastRsyncDeltaHeader()
@@ -96,8 +97,11 @@ namespace FastRsync.Delta
                 throw new InvalidDataException("The delta file uses a newer file format than this program can handle.");
 
             var metadataStr = reader.ReadString();
+#if NET7_0_OR_GREATER
+            _metadata = JsonSerializer.Deserialize(metadataStr, JsonContextCore.Default.DeltaMetadata);
+#else
             _metadata = JsonSerializer.Deserialize<DeltaMetadata>(metadataStr, JsonSerializationSettings.JsonSettings);
-
+#endif
             hashAlgorithm = SupportedAlgorithms.Hashing.Create(_metadata.HashAlgorithm);
             expectedHash = Convert.FromBase64String(_metadata.ExpectedFileHash);
 
@@ -130,7 +134,7 @@ namespace FastRsync.Delta
         }
 
         public void Apply(
-            Action<byte[]> writeData, 
+            Action<byte[]> writeData,
             Action<long, long> copy)
         {
             var fileLength = reader.BaseStream.Length;
@@ -160,7 +164,7 @@ namespace FastRsync.Delta
                     long soFar = 0;
                     while (soFar < length)
                     {
-                        var bytes = reader.ReadBytes((int) Math.Min(length - soFar, readBufferSize));
+                        var bytes = reader.ReadBytes((int)Math.Min(length - soFar, readBufferSize));
                         soFar += bytes.Length;
                         writeData(bytes);
                     }
@@ -168,9 +172,11 @@ namespace FastRsync.Delta
             }
         }
 
-        public Task ApplyAsync(Func<byte[], Task> writeData, Func<long, long, Task> copy) => ApplyAsync(writeData, copy, CancellationToken.None);
+        public Task ApplyAsync(Func<byte[], Task> writeData, Func<long, long, Task> copy) =>
+            ApplyAsync(writeData, copy, CancellationToken.None);
 
-        public async Task ApplyAsync(Func<byte[], Task> writeData, Func<long, long, Task> copy, CancellationToken cancellationToken)
+        public async Task ApplyAsync(Func<byte[], Task> writeData, Func<long, long, Task> copy,
+            CancellationToken cancellationToken)
         {
             var fileLength = reader.BaseStream.Length;
 
@@ -201,7 +207,9 @@ namespace FastRsync.Delta
                     long soFar = 0;
                     while (soFar < length)
                     {
-                        var bytesRead = await reader.BaseStream.ReadAsync(buffer, 0, (int) Math.Min(length - soFar, buffer.Length), cancellationToken).ConfigureAwait(false);
+                        var bytesRead = await reader.BaseStream
+                            .ReadAsync(buffer, 0, (int)Math.Min(length - soFar, buffer.Length), cancellationToken)
+                            .ConfigureAwait(false);
                         var bytes = buffer;
                         if (bytesRead != buffer.Length)
                         {
