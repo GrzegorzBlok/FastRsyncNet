@@ -45,8 +45,4 @@
   <ItemGroup>
     <Folder Include="Properties\"/>
   </ItemGroup>
-
-  <ItemGroup Condition="'$(TargetFramework)' == 'net7.0'">
-    <PackageReference Include="System.Text.Json" Version="7.0.3"/>
-  </ItemGroup>
 </Project>
