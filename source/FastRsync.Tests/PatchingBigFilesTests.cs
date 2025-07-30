@@ -15,7 +15,7 @@ namespace FastRsync.Tests;
 public class PatchingBigFilesTests
 {
     [Test]
-    [TestCase(1050, 1790)]
+    [TestCase(2050, 2790)]
     public void PatchingSyncXXHash_BigFile(int baseNumberOfMBytes, int newNumberOfMBytes)
     {
         // Arrange

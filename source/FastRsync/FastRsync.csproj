@@ -10,9 +10,9 @@
     <PackageProjectUrl>https://github.com/GrzegorzBlok/FastRsyncNet</PackageProjectUrl>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
-    <AssemblyVersion>2.4.3</AssemblyVersion>
-    <FileVersion>2.4.3</FileVersion>
-    <Version>2.4.3</Version>
+    <AssemblyVersion>2.4.4</AssemblyVersion>
+    <FileVersion>2.4.4</FileVersion>
+    <Version>2.4.4</Version>
     <PackageTags>sync;rsync;synchronization</PackageTags>
     <Description>
       .NET library for file synchronization based on Rsync algorithm. Optimized for speed and data size to achieve best network performance.
