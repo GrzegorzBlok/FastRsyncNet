@@ -8,111 +8,110 @@ using FastRsync.Signature;
 using NSubstitute;
 using NUnit.Framework;
 
-namespace FastRsync.Tests
+namespace FastRsync.Tests;
+
+[TestFixture]
+public class SignatureBuilderSyncRandomDataTests
 {
-    [TestFixture]
-    public class SignatureBuilderSyncRandomDataTests
+    [Test]
+    [TestCase(2, SignatureBuilder.MinimumChunkSize)]
+    [TestCase(10, SignatureBuilder.MinimumChunkSize)]
+    [TestCase(16974, SignatureBuilder.MinimumChunkSize)]
+    [TestCase(2, SignatureBuilder.DefaultChunkSize)]
+    [TestCase(10, SignatureBuilder.DefaultChunkSize)]
+    [TestCase(16974, SignatureBuilder.DefaultChunkSize)]
+    [TestCase(2, SignatureBuilder.MaximumChunkSize)]
+    [TestCase(10, SignatureBuilder.MaximumChunkSize)]
+    [TestCase(16974, SignatureBuilder.MaximumChunkSize)]
+    public void SignatureBuilderXXHash_ForRandomData_BuildsSignature(int numberOfBytes, short chunkSize)
     {
-        [Test]
-        [TestCase(2, SignatureBuilder.MinimumChunkSize)]
-        [TestCase(10, SignatureBuilder.MinimumChunkSize)]
-        [TestCase(16974, SignatureBuilder.MinimumChunkSize)]
-        [TestCase(2, SignatureBuilder.DefaultChunkSize)]
-        [TestCase(10, SignatureBuilder.DefaultChunkSize)]
-        [TestCase(16974, SignatureBuilder.DefaultChunkSize)]
-        [TestCase(2, SignatureBuilder.MaximumChunkSize)]
-        [TestCase(10, SignatureBuilder.MaximumChunkSize)]
-        [TestCase(16974, SignatureBuilder.MaximumChunkSize)]
-        public void SignatureBuilderXXHash_ForRandomData_BuildsSignature(int numberOfBytes, short chunkSize)
+        // Arrange
+        var data = new byte[numberOfBytes];
+        new Random().NextBytes(data);
+        var dataStream = new MemoryStream(data);
+        var signatureStream = new MemoryStream();
+
+        var progressReporter = Substitute.For<IProgress<ProgressReport>>();
+
+        // Act
+        var target = new SignatureBuilder
         {
-            // Arrange
-            var data = new byte[numberOfBytes];
-            new Random().NextBytes(data);
-            var dataStream = new MemoryStream(data);
-            var signatureStream = new MemoryStream();
+            ChunkSize = chunkSize,
+            ProgressReport = progressReporter
+        };
+        target.Build(dataStream, new SignatureWriter(signatureStream));
 
-            var progressReporter = Substitute.For<IProgress<ProgressReport>>();
+        // Assert
+        CommonAsserts.ValidateSignature(signatureStream, SupportedAlgorithms.Hashing.XxHash(), Utils.GetMd5(data), new Adler32RollingChecksum());
 
-            // Act
-            var target = new SignatureBuilder
-            {
-                ChunkSize = chunkSize,
-                ProgressReport = progressReporter
-            };
-            target.Build(dataStream, new SignatureWriter(signatureStream));
+        progressReporter.Received().Report(Arg.Any<ProgressReport>());
+    }
 
-            // Assert
-            CommonAsserts.ValidateSignature(signatureStream, SupportedAlgorithms.Hashing.XxHash(), Utils.GetMd5(data), new Adler32RollingChecksum());
+    [Test]
+    [TestCase(2, SignatureBuilder.MinimumChunkSize)]
+    [TestCase(10, SignatureBuilder.MinimumChunkSize)]
+    [TestCase(16974, SignatureBuilder.MinimumChunkSize)]
+    [TestCase(2, SignatureBuilder.DefaultChunkSize)]
+    [TestCase(10, SignatureBuilder.DefaultChunkSize)]
+    [TestCase(16974, SignatureBuilder.DefaultChunkSize)]
+    [TestCase(2, SignatureBuilder.MaximumChunkSize)]
+    [TestCase(10, SignatureBuilder.MaximumChunkSize)]
+    [TestCase(16974, SignatureBuilder.MaximumChunkSize)]
+    public void SignatureBuilderXXHashAdlerV2_ForRandomData_BuildsSignature(int numberOfBytes, short chunkSize)
+    {
+        // Arrange
+        var data = new byte[numberOfBytes];
+        new Random().NextBytes(data);
+        var dataStream = new MemoryStream(data);
+        var signatureStream = new MemoryStream();
 
-            progressReporter.Received().Report(Arg.Any<ProgressReport>());
-        }
+        var progressReporter = Substitute.For<IProgress<ProgressReport>>();
 
-        [Test]
-        [TestCase(2, SignatureBuilder.MinimumChunkSize)]
-        [TestCase(10, SignatureBuilder.MinimumChunkSize)]
-        [TestCase(16974, SignatureBuilder.MinimumChunkSize)]
-        [TestCase(2, SignatureBuilder.DefaultChunkSize)]
-        [TestCase(10, SignatureBuilder.DefaultChunkSize)]
-        [TestCase(16974, SignatureBuilder.DefaultChunkSize)]
-        [TestCase(2, SignatureBuilder.MaximumChunkSize)]
-        [TestCase(10, SignatureBuilder.MaximumChunkSize)]
-        [TestCase(16974, SignatureBuilder.MaximumChunkSize)]
-        public void SignatureBuilderXXHashAdlerV2_ForRandomData_BuildsSignature(int numberOfBytes, short chunkSize)
+        // Act
+        var target = new SignatureBuilder(SupportedAlgorithms.Hashing.XxHash(), SupportedAlgorithms.Checksum.Adler32RollingV2())
         {
-            // Arrange
-            var data = new byte[numberOfBytes];
-            new Random().NextBytes(data);
-            var dataStream = new MemoryStream(data);
-            var signatureStream = new MemoryStream();
+            ChunkSize = chunkSize,
+            ProgressReport = progressReporter
+        };
+        target.Build(dataStream, new SignatureWriter(signatureStream));
 
-            var progressReporter = Substitute.For<IProgress<ProgressReport>>();
+        // Assert
+        CommonAsserts.ValidateSignature(signatureStream, SupportedAlgorithms.Hashing.XxHash(), Utils.GetMd5(data), new Adler32RollingChecksumV2());
 
-            // Act
-            var target = new SignatureBuilder(SupportedAlgorithms.Hashing.XxHash(), SupportedAlgorithms.Checksum.Adler32RollingV2())
-            {
-                ChunkSize = chunkSize,
-                ProgressReport = progressReporter
-            };
-            target.Build(dataStream, new SignatureWriter(signatureStream));
+        progressReporter.Received().Report(Arg.Any<ProgressReport>());
+    }
 
-            // Assert
-            CommonAsserts.ValidateSignature(signatureStream, SupportedAlgorithms.Hashing.XxHash(), Utils.GetMd5(data), new Adler32RollingChecksumV2());
+    [Test]
+    [TestCase(2, SignatureBuilder.MinimumChunkSize)]
+    [TestCase(10, SignatureBuilder.MinimumChunkSize)]
+    [TestCase(16974, SignatureBuilder.MinimumChunkSize)]
+    [TestCase(2, SignatureBuilder.DefaultChunkSize)]
+    [TestCase(10, SignatureBuilder.DefaultChunkSize)]
+    [TestCase(16974, SignatureBuilder.DefaultChunkSize)]
+    [TestCase(2, SignatureBuilder.MaximumChunkSize)]
+    [TestCase(10, SignatureBuilder.MaximumChunkSize)]
+    [TestCase(16974, SignatureBuilder.MaximumChunkSize)]
+    public void SignatureBuilderSha1_ForRandomData_BuildsSignature(int numberOfBytes, short chunkSize)
+    {
+        // Arrange
+        var data = new byte[numberOfBytes];
+        new Random().NextBytes(data);
+        var dataStream = new MemoryStream(data);
+        var signatureStream = new MemoryStream();
 
-            progressReporter.Received().Report(Arg.Any<ProgressReport>());
-        }
+        var progressReporter = Substitute.For<IProgress<ProgressReport>>();
 
-        [Test]
-        [TestCase(2, SignatureBuilder.MinimumChunkSize)]
-        [TestCase(10, SignatureBuilder.MinimumChunkSize)]
-        [TestCase(16974, SignatureBuilder.MinimumChunkSize)]
-        [TestCase(2, SignatureBuilder.DefaultChunkSize)]
-        [TestCase(10, SignatureBuilder.DefaultChunkSize)]
-        [TestCase(16974, SignatureBuilder.DefaultChunkSize)]
-        [TestCase(2, SignatureBuilder.MaximumChunkSize)]
-        [TestCase(10, SignatureBuilder.MaximumChunkSize)]
-        [TestCase(16974, SignatureBuilder.MaximumChunkSize)]
-        public void SignatureBuilderSha1_ForRandomData_BuildsSignature(int numberOfBytes, short chunkSize)
+        // Act
+        var target = new SignatureBuilder(SupportedAlgorithms.Hashing.Sha1(), SupportedAlgorithms.Checksum.Adler32Rolling())
         {
-            // Arrange
-            var data = new byte[numberOfBytes];
-            new Random().NextBytes(data);
-            var dataStream = new MemoryStream(data);
-            var signatureStream = new MemoryStream();
+            ChunkSize = chunkSize,
+            ProgressReport = progressReporter
+        };
+        target.Build(dataStream, new SignatureWriter(signatureStream));
 
-            var progressReporter = Substitute.For<IProgress<ProgressReport>>();
+        // Assert
+        CommonAsserts.ValidateSignature(signatureStream, new CryptographyHashAlgorithmWrapper("SHA1", SHA1.Create()), Utils.GetMd5(data), new Adler32RollingChecksum());
 
-            // Act
-            var target = new SignatureBuilder(SupportedAlgorithms.Hashing.Sha1(), SupportedAlgorithms.Checksum.Adler32Rolling())
-            {
-                ChunkSize = chunkSize,
-                ProgressReport = progressReporter
-            };
-            target.Build(dataStream, new SignatureWriter(signatureStream));
-
-            // Assert
-            CommonAsserts.ValidateSignature(signatureStream, new CryptographyHashAlgorithmWrapper("SHA1", SHA1.Create()), Utils.GetMd5(data), new Adler32RollingChecksum());
-
-            progressReporter.Received().Report(Arg.Any<ProgressReport>());
-        }
+        progressReporter.Received().Report(Arg.Any<ProgressReport>());
     }
 }

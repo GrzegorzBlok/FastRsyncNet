@@ -1,9 +1,8 @@
-﻿namespace FastRsync.Tests.FastRsyncLegacy
+﻿namespace FastRsync.Tests.FastRsyncLegacy;
+
+internal class DeltaMetadataLegacy
 {
-    internal class DeltaMetadataLegacy
-    {
-        public string HashAlgorithm { get; set; }
-        public string ExpectedFileHashAlgorithm { get; set; }
-        public string ExpectedFileHash { get; set; }
-    }
+    public string HashAlgorithm { get; set; }
+    public string ExpectedFileHashAlgorithm { get; set; }
+    public string ExpectedFileHash { get; set; }
 }
