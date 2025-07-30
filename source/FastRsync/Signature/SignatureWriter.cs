@@ -21,7 +21,12 @@ namespace FastRsync.Signature
         {
             bw.Write(FastRsyncBinaryFormat.SignatureHeader);
             bw.Write(FastRsyncBinaryFormat.Version);
+#if NET7_0_OR_GREATER
+            var metadataStr = JsonSerializer.Serialize(metadata, JsonContextCore.Default.SignatureMetadata);
+#else
             var metadataStr = JsonSerializer.Serialize(metadata, JsonSerializationSettings.JsonSettings);
+#endif
+
             bw.Write(metadataStr);
         }
 
@@ -54,7 +59,8 @@ namespace FastRsync.Signature
         {
             signaturebw.Write(signature.Length);
             signaturebw.Write(signature.RollingChecksum);
-            await signatureStream.WriteAsync(signature.Hash, 0, signature.Hash.Length, cancellationToken).ConfigureAwait(false);
+            await signatureStream.WriteAsync(signature.Hash, 0, signature.Hash.Length, cancellationToken)
+                .ConfigureAwait(false);
         }
     }
 }

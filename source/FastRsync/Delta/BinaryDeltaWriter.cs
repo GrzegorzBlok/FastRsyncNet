@@ -24,7 +24,11 @@ namespace FastRsync.Delta
         {
             writer.Write(FastRsyncBinaryFormat.DeltaHeader);
             writer.Write(FastRsyncBinaryFormat.Version);
+#if NET7_0_OR_GREATER
+            var metadataStr = JsonSerializer.Serialize(metadata, JsonContextCore.Default.DeltaMetadata);
+#else
             var metadataStr = JsonSerializer.Serialize(metadata, JsonSerializationSettings.JsonSettings);
+#endif
             writer.Write(metadataStr);
         }
 
@@ -61,7 +65,8 @@ namespace FastRsync.Delta
             }
         }
 
-        public async Task WriteDataCommandAsync(Stream source, long offset, long length, CancellationToken cancellationToken)
+        public async Task WriteDataCommandAsync(Stream source, long offset, long length,
+            CancellationToken cancellationToken)
         {
             writer.Write(BinaryFormat.DataCommand);
             writer.Write(length);
@@ -75,7 +80,9 @@ namespace FastRsync.Delta
 
                 int read;
                 long soFar = 0;
-                while ((read = await source.ReadAsync(buffer, 0, (int)Math.Min(length - soFar, buffer.Length), cancellationToken).ConfigureAwait(false)) > 0)
+                while ((read = await source
+                           .ReadAsync(buffer, 0, (int)Math.Min(length - soFar, buffer.Length), cancellationToken)
+                           .ConfigureAwait(false)) > 0)
                 {
                     soFar += read;
                     await deltaStream.WriteAsync(buffer, 0, read, cancellationToken).ConfigureAwait(false);
