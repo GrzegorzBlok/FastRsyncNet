@@ -23,7 +23,7 @@ using FastRsync.Signature;
 
 ...
 
-var signatureBuilder = new SignatureBuilder();
+var signatureBuilder = new SignatureBuilder(SupportedAlgorithms.Hashing.XxHash3(), SupportedAlgorithms.Checksum.Adler32RollingV3());
 using (var basisStream = new FileStream(basisFilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
 using (var signatureStream = new FileStream(signatureFilePath, FileMode.Create, FileAccess.Write, FileShare.Read))
 {
@@ -82,7 +82,7 @@ var basisBlob = blobsContainer.GetBlockBlobReference("blobName");
 
 var signatureBlob = container.GetBlockBlobReference("blob_signature");
 
-var signatureBuilder = new SignatureBuilder();
+var signatureBuilder = new SignatureBuilder(SupportedAlgorithms.Hashing.XxHash3(), SupportedAlgorithms.Checksum.Adler32RollingV3());
 using (var signatureStream = await signatureBlob.OpenWriteAsync())
 using (var basisStream = await basisBlob.OpenReadAsync())
 {
@@ -94,17 +94,18 @@ using (var basisStream = await basisBlob.OpenReadAsync())
 
 Following signature hashing algorithms are available:
 
- * XxHash64 - default algorithm, signature size 6.96 MB, signature calculation time 5209 ms
- * SHA1 - signature size 12.9 MB, signature calculation time 6519 ms
- * XxHash3 - signature size 6.96 MB, signature calculation time 5024 ms
- * MD5 - originally used in Rsync program, signature size 10.9 MB, signature calculation time 6767 ms
+ * XxHash64 - default algorithm, signature size 6.96 MB, signature calculation time 5209 ms.
+ * XxHash3 - signature size 6.96 MB, signature calculation time 5024 ms. For all new use cases, use this one.
+ * SHA1 - signature size 12.9 MB, signature calculation time 6519 ms.
+ * MD5 - originally used in Rsync program, signature size 10.9 MB, signature calculation time 6767 ms.
 
 The signature sizes and calculation times are to provide some insights on relative perfomance. The real perfomance on your system will vary greatly. The benchmark had been run against 0.99 GB file.
 
 Following rolling checksum algorithms are available:
 
- * Adler32RollingChecksum - default algorithm, it uses low level optimization that makes it faster but provides worse quality of checksum
- * Adler32RollingChecksumV2 - the original Adler32 algorithm implementation, slower but better quality of checksum 
+ * Adler32RollingChecksum - default algorithm, it uses low level optimization that makes it faster but provides worse quality of checksum.
+ * Adler32RollingChecksumV2 - Obsolete. It has a bug that - while does not make any data incorrect - results in unnecessary big deltas. Do not use it, unless you need to due to the backward compatibility. It is the original (but incorrectly implemented) Adler32 algorithm implementation (slower but better quality of checksum).
+ * Adler32RollingChecksumV3 - for all new use cases, use this one. It is fast and has best quality of checksum.
 
 ## GZip compression that is rsync compatible [![NuGet](https://img.shields.io/nuget/v/FastRsyncNet.Compression.svg?style=flat)](https://www.nuget.org/packages/FastRsyncNet.Compression/)
 If you synchronize a compressed file, a small change in a compressed file may force rsync algorithm to synchronize whole compressed file, instead of just the changed blocks. To fix this, a custom GZip compression method may be used that periodically reset the compressor state to make it block-sync friendly. Install [FastRsyncNet.Compression](https://www.nuget.org/packages/FastRsyncNet.Compression/) package and use following method:
