@@ -4,15 +4,15 @@
   </PropertyGroup>
   <PropertyGroup>
 
-    <TargetFrameworks>net462;netstandard2.0;net7.0</TargetFrameworks>
+    <TargetFrameworks>net462;netstandard2.0;net7.0;net8.0;net9.0;net10.0</TargetFrameworks>
     <PackageId>FastRsyncNet</PackageId>
     <Authors>Grzegorz Blok</Authors>
     <PackageProjectUrl>https://github.com/GrzegorzBlok/FastRsyncNet</PackageProjectUrl>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
-    <AssemblyVersion>2.4.4</AssemblyVersion>
-    <FileVersion>2.4.4</FileVersion>
-    <Version>2.4.4</Version>
+    <AssemblyVersion>2.4.5</AssemblyVersion>
+    <FileVersion>2.4.5</FileVersion>
+    <Version>2.4.5</Version>
     <PackageTags>sync;rsync;synchronization</PackageTags>
     <Description>
       .NET library for file synchronization based on Rsync algorithm. Optimized for speed and data size to achieve best network performance.
