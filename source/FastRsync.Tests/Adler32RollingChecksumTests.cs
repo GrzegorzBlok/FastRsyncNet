@@ -1,5 +1,4 @@
-﻿using System.Text;
-using FastRsync.Hash;
+﻿using FastRsync.Hash;
 using NUnit.Framework;
 
 namespace FastRsync.Tests;
@@ -11,11 +10,11 @@ public class Adler32RollingChecksumTests
     public void Adler32RollingChecksum_CalculatesChecksum()
     {
         // Arrange
-        var data1 = Encoding.ASCII.GetBytes("Adler32 checksum test");
-        var data2 = Encoding.ASCII.GetBytes("Fast Rsync Fast Rsync");
-        var data3 = Encoding.ASCII.GetBytes("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
-        var data4 = Encoding.ASCII.GetBytes("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis malesuada turpis non libero faucibus sodales. Mauris eget justo est. Pellentesque.");
-        var data5 = Encoding.ASCII.GetBytes("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.");
+        var data1 = "Adler32 checksum test"u8.ToArray();
+        var data2 = "Fast Rsync Fast Rsync"u8.ToArray();
+        var data3 = "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"u8.ToArray();
+        var data4 = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis malesuada turpis non libero faucibus sodales. Mauris eget justo est. Pellentesque."u8.ToArray();
+        var data5 = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."u8.ToArray();
 
         // Act
         var checksum1 = new Adler32RollingChecksum().Calculate(data1, 0, data1.Length);

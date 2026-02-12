@@ -1,5 +1,8 @@
-﻿namespace FastRsync.Hash
+﻿using System;
+
+namespace FastRsync.Hash
 {
+    [Obsolete("Adler32V2 has buggy mod operation implemented. See https://github.com/GrzegorzBlok/FastRsyncNet/issues/20")]
     public class Adler32RollingChecksumV2 : IRollingChecksum
     {
         public string Name => "Adler32V2";

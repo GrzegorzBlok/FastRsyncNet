@@ -55,7 +55,10 @@ namespace FastRsync.Core
         public static class Checksum
         {
             public static IRollingChecksum Adler32Rolling() { return new Adler32RollingChecksum();  }
+            [Obsolete("Adler32V2 has buggy mod operation implemented. See https://github.com/GrzegorzBlok/FastRsyncNet/issues/20")]
             public static IRollingChecksum Adler32RollingV2() { return new Adler32RollingChecksumV2(); }
+
+            public static IRollingChecksum Adler32RollingV3() { return new Adler32RollingChecksumV3(); }
 
             public static IRollingChecksum Default()
             {
@@ -64,11 +67,17 @@ namespace FastRsync.Core
 
             public static IRollingChecksum Create(string algorithm)
             {
-                if (algorithm == "Adler32")
-                    return Adler32Rolling();
-                if (algorithm == "Adler32V2")
-                    return Adler32RollingV2();
-                throw new NotSupportedException($"The rolling checksum algorithm '{algorithm}' is not supported");
+                switch (algorithm)
+                {
+                    case "Adler32":
+                        return Adler32Rolling();
+                    case "Adler32V2":
+                        return Adler32RollingV2();
+                    case "Adler32V3":
+                        return Adler32RollingV3();
+                    default:
+                        throw new NotSupportedException($"The rolling checksum algorithm '{algorithm}' is not supported");
+                }
             }
         }
     }
