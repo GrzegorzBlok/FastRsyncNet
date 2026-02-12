@@ -69,7 +69,7 @@ public class PatchingBigFilesTests
             Assert.That(CompareFilesByHash(newFileName, patchedFileName), Is.True);
             progressReporter.Received().Report(Arg.Any<ProgressReport>());
         }
-        catch (Exception e)
+        catch (Exception)
         {
             Assert.Fail();
         }
