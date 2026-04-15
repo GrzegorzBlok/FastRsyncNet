@@ -36,7 +36,7 @@ public class OctodiffDeltaBuilder
         {
             var startPosition = newFileStream.Position;
             var read = newFileStream.Read(buffer, 0, buffer.Length);
-            if (read < 0)
+            if (read <= 0)
                 break;
 
             var checksumAlgorithm = signature.RollingChecksumAlgorithm;

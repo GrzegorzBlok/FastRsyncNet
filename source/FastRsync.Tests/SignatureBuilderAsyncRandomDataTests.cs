@@ -58,7 +58,7 @@ public class SignatureBuilderAsyncRandomDataTests
     [TestCase(2, SignatureBuilder.MaximumChunkSize)]
     [TestCase(10, SignatureBuilder.MaximumChunkSize)]
     [TestCase(16974, SignatureBuilder.MaximumChunkSize)]
-    public async Task SignatureBuilderAsyncXXHashAdlerV2_ForRandomData_BuildsSignature(int numberOfBytes, short chunkSize)
+    public async Task SignatureBuilderAsyncXXHashAdlerV3_ForRandomData_BuildsSignature(int numberOfBytes, short chunkSize)
     {
         // Arrange
         var data = new byte[numberOfBytes];
@@ -69,7 +69,7 @@ public class SignatureBuilderAsyncRandomDataTests
         var progressReporter = Substitute.For<IProgress<ProgressReport>>();
 
         // Act
-        var target = new SignatureBuilder(SupportedAlgorithms.Hashing.XxHash(), SupportedAlgorithms.Checksum.Adler32RollingV2())
+        var target = new SignatureBuilder(SupportedAlgorithms.Hashing.XxHash(), SupportedAlgorithms.Checksum.Adler32RollingV3())
         {
             ChunkSize = chunkSize,
             ProgressReport = progressReporter
@@ -77,7 +77,7 @@ public class SignatureBuilderAsyncRandomDataTests
         await target.BuildAsync(dataStream, new SignatureWriter(signatureStream)).ConfigureAwait(false);
 
         // Assert
-        CommonAsserts.ValidateSignature(signatureStream, SupportedAlgorithms.Hashing.XxHash(), Utils.GetMd5(data), new Adler32RollingChecksumV2());
+        CommonAsserts.ValidateSignature(signatureStream, SupportedAlgorithms.Hashing.XxHash(), Utils.GetMd5(data), new Adler32RollingChecksumV3());
 
         progressReporter.Received().Report(Arg.Any<ProgressReport>());
     }

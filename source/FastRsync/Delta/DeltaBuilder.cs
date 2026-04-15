@@ -59,7 +59,7 @@ namespace FastRsync.Delta
             {
                 var startPosition = newFileStream.Position;
                 var read = newFileStream.Read(buffer, 0, buffer.Length);
-                if (read < 0)
+                if (read <= 0)
                     break;
                 
                 uint checksum = 0;
@@ -178,7 +178,7 @@ namespace FastRsync.Delta
             {
                 var startPosition = newFileStream.Position;
                 var read = await newFileStream.ReadAsync(buffer, 0, buffer.Length, cancellationToken).ConfigureAwait(false);
-                if (read < 0)
+                if (read <= 0)
                     break;
 
                 uint checksum = 0;

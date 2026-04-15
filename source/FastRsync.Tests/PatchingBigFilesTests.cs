@@ -6,8 +6,8 @@ using NSubstitute;
 using NUnit.Framework;
 using System;
 using System.IO;
-using System.Linq;
 using System.Security.Cryptography;
+using FastRsync.Hash;
 
 namespace FastRsync.Tests;
 
@@ -15,10 +15,16 @@ namespace FastRsync.Tests;
 public class PatchingBigFilesTests
 {
     [Test]
-    [TestCase(2050, 2790)]
-    public void PatchingSyncXXHash_BigFile(int baseNumberOfMBytes, int newNumberOfMBytes)
+    [TestCase(2050, 2790, "XXH64", "Adler32")]
+    [TestCase(2050, 2790, "XXH3", "Adler32")]
+    [TestCase(2050, 2790, "XXH64", "Adler32V3")]
+    [TestCase(2050, 2790, "XXH3", "Adler32V3")]
+    public void PatchingSyncXXHash_BigFile(int baseNumberOfMBytes, int newNumberOfMBytes, string signatureHashingAlgorithm, string rollingChecksumAlgorithm)
     {
         // Arrange
+        var signatureHash = SupportedAlgorithms.Hashing.Create(signatureHashingAlgorithm);
+        var rollingChecksum = SupportedAlgorithms.Checksum.Create(rollingChecksumAlgorithm);
+
         var baseFileName = Path.GetTempFileName();
         var newFileName = Path.GetTempFileName();
         try
@@ -49,7 +55,7 @@ public class PatchingBigFilesTests
 
                 newFileStream.Seek(0, SeekOrigin.Begin);
 
-                using var baseSignatureStream = PrepareTestData(baseFileStream);
+                using var baseSignatureStream = PrepareTestData(baseFileStream, signatureHash, rollingChecksum);
 
                 // Act
                 using var deltaStream = new FileStream(deltaFileName, FileMode.OpenOrCreate);
@@ -80,11 +86,11 @@ public class PatchingBigFilesTests
         }
     }
 
-    public static Stream PrepareTestData(Stream baseDataStream)
+    public static Stream PrepareTestData(Stream baseDataStream, IHashAlgorithm signatureHashingAlgorithm, IRollingChecksum rollingChecksumAlgorithm)
     {
         var baseSignatureStream = new MemoryStream();
 
-        var signatureBuilder = new SignatureBuilder();
+        var signatureBuilder = new SignatureBuilder(signatureHashingAlgorithm, rollingChecksumAlgorithm);
         signatureBuilder.Build(baseDataStream, new SignatureWriter(baseSignatureStream));
         baseSignatureStream.Seek(0, SeekOrigin.Begin);
         return baseSignatureStream;
