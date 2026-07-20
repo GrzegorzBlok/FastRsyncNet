@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Text;
 using FastRsync.Core;
 using FastRsync.Diagnostics;
 using FastRsync.Hash;
@@ -48,6 +49,29 @@ public class SignatureReaderTests
         var target = new SignatureReader(signatureStream, progressReporter);
 
         // Assert
+        Assert.Throws<InvalidDataException>(() => target.ReadSignature());
+    }
+
+    [Test]
+    public void SignatureReader_ChunkWithNegativeLength_ThrowsInvalidDataException()
+    {
+        // Arrange - valid FastRsync signature header followed by a chunk whose Int16 length
+        // has the high bit set (negative). Before validation was added, the negative length
+        // corrupted the accumulated chunk StartOffset, which later feeds delta copy commands.
+        var signatureStream = new MemoryStream();
+        var writer = new BinaryWriter(signatureStream);
+        writer.Write(Encoding.ASCII.GetBytes("FRSNCSG"));
+        writer.Write((byte)0x01);
+        writer.Write("{\"chunkHashAlgorithm\":\"XXH64\",\"rollingChecksumAlgorithm\":\"Adler32\"}");
+        writer.Write((short)-1);        // negative chunk length
+        writer.Write(0xDEADBEEF);       // rolling checksum
+        writer.Write(new byte[8]);      // XXH64 chunk hash
+        writer.Flush();
+        signatureStream.Seek(0, SeekOrigin.Begin);
+
+        var target = new SignatureReader(signatureStream, null);
+
+        // Act & Assert
         Assert.Throws<InvalidDataException>(() => target.ReadSignature());
     }
 }

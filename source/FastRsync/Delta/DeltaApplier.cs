@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -89,7 +88,7 @@ namespace FastRsync.Delta
 
             var actualHash = algorithm.ComputeHash(outputStream);
 
-            return StructuralComparisons.StructuralEqualityComparer.Equals(sourceFileHash, actualHash);
+            return ByteArrayEquality.AreEqual(sourceFileHash, actualHash);
         }
 
         public Task<bool> HashCheckAsync(IDeltaReader delta, Stream outputStream) => HashCheckAsync(delta, outputStream, CancellationToken.None);
@@ -103,7 +102,7 @@ namespace FastRsync.Delta
 
             var actualHash = await algorithm.ComputeHashAsync(outputStream, cancellationToken).ConfigureAwait(false);
 
-            return StructuralComparisons.StructuralEqualityComparer.Equals(sourceFileHash, actualHash);
+            return ByteArrayEquality.AreEqual(sourceFileHash, actualHash);
         }
     }
 }

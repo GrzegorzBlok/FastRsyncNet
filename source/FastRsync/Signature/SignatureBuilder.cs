@@ -14,6 +14,12 @@ namespace FastRsync.Signature
         public const short DefaultChunkSize = 2048;
         public const short MaximumChunkSize = 31 * 1024;
 
+        // The base file is read twice (verification hash + chunk hashes) in small increments.
+        // Buffering batches those into large reads, which matters when the base file is a
+        // network-backed stream (e.g. Azure Blob). Kept below the 85KB large-object-heap
+        // threshold because the buffer is allocated on every Build call.
+        private const int StreamBufferSize = 64 * 1024;
+
         private short chunkSize;
 
         public SignatureBuilder() : this(SupportedAlgorithms.Hashing.Default(), SupportedAlgorithms.Checksum.Default())
@@ -49,8 +55,9 @@ namespace FastRsync.Signature
 
         public void Build(Stream baseDataStream, ISignatureWriter signatureWriter)
         {
-            WriteMetadata(baseDataStream, signatureWriter);
-            WriteChunkSignatures(baseDataStream, signatureWriter);
+            var bufferedStream = new BufferedStream(baseDataStream, StreamBufferSize);
+            WriteMetadata(bufferedStream, signatureWriter);
+            WriteChunkSignatures(bufferedStream, signatureWriter);
         }
 
         public Task BuildAsync(Stream baseDataStream, ISignatureWriter signatureWriter) =>
@@ -58,8 +65,9 @@ namespace FastRsync.Signature
 
         public async Task BuildAsync(Stream baseDataStream, ISignatureWriter signatureWriter, CancellationToken cancellationToken)
         {
-            await WriteMetadataAsync(baseDataStream, signatureWriter, cancellationToken).ConfigureAwait(false);
-            await WriteChunkSignaturesAsync(baseDataStream, signatureWriter, cancellationToken).ConfigureAwait(false);
+            var bufferedStream = new BufferedStream(baseDataStream, StreamBufferSize);
+            await WriteMetadataAsync(bufferedStream, signatureWriter, cancellationToken).ConfigureAwait(false);
+            await WriteChunkSignaturesAsync(bufferedStream, signatureWriter, cancellationToken).ConfigureAwait(false);
         }
 
         private void WriteMetadata(Stream baseFileStream, ISignatureWriter signatureWriter)
@@ -136,7 +144,7 @@ namespace FastRsync.Signature
             long start = 0;
             int read;
             var block = new byte[ChunkSize];
-            while ((read = baseFileStream.Read(block, 0, block.Length)) > 0)
+            while ((read = ReadWholeBlock(baseFileStream, block)) > 0)
             {
                 signatureWriter.WriteChunk(new ChunkSignature
                 {
@@ -156,6 +164,32 @@ namespace FastRsync.Signature
             }
         }
 
+        // Stream.Read may return less than the requested count (network streams often do).
+        // A chunk built from a partial read would have a non-standard length, which delta
+        // building can never match against, so keep reading until the block is full or the
+        // stream ends.
+        private static int ReadWholeBlock(Stream stream, byte[] block)
+        {
+            var total = 0;
+            int read;
+            while (total < block.Length && (read = stream.Read(block, total, block.Length - total)) > 0)
+            {
+                total += read;
+            }
+            return total;
+        }
+
+        private static async Task<int> ReadWholeBlockAsync(Stream stream, byte[] block, CancellationToken cancellationToken)
+        {
+            var total = 0;
+            int read;
+            while (total < block.Length && (read = await stream.ReadAsync(block, total, block.Length - total, cancellationToken).ConfigureAwait(false)) > 0)
+            {
+                total += read;
+            }
+            return total;
+        }
+
         private async Task WriteChunkSignaturesAsync(Stream baseFileStream, ISignatureWriter signatureWriter, CancellationToken cancellationToken)
         {
             var checksumAlgorithm = RollingChecksumAlgorithm;
@@ -172,7 +206,7 @@ namespace FastRsync.Signature
             long start = 0;
             int read;
             var block = new byte[ChunkSize];
-            while ((read = await baseFileStream.ReadAsync(block, 0, block.Length, cancellationToken).ConfigureAwait(false)) > 0)
+            while ((read = await ReadWholeBlockAsync(baseFileStream, block, cancellationToken).ConfigureAwait(false)) > 0)
             {
                 await signatureWriter.WriteChunkAsync(new ChunkSignature
                 {

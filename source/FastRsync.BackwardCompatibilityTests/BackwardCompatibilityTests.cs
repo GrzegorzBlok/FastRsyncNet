@@ -91,6 +91,33 @@ namespace FastRsync.BackwardCompatibilityTests
             progressReporter.Received().Report(Arg.Any<ProgressReport>());
         }
 
+        [Test]
+        [TestCase(1378)]
+        [TestCase(13780)]
+        [TestCase(137800)]
+        public async Task LegacyLibraryAppliesNewPatchBuiltWithSkipDeltaIfHashesMatch(int baseNumberOfBytes)
+        {
+            // Arrange - the "new" file is identical to the basis file and the delta is built with
+            // SkipDeltaIfHashesMatch enabled, which produces a metadata-plus-single-copy-command delta.
+            // This verifies the optimized delta remains applicable by FastRsync 2.3.1.
+            var (baseDataStream, baseSignatureStream, _, _) = await PrepareTestDataAsync(baseNumberOfBytes, 0, SupportedAlgorithms.Checksum.Adler32Rolling()).ConfigureAwait(false);
+            var newDataStream = new MemoryStream(baseDataStream.ToArray());
+
+            var deltaStream = new MemoryStream();
+            var deltaBuilder = new DeltaBuilder { SkipDeltaIfHashesMatch = true };
+            await deltaBuilder.BuildDeltaAsync(newDataStream, new SignatureReader(baseSignatureStream, null), new AggregateCopyOperationsDecorator(new BinaryDeltaWriter(deltaStream))).ConfigureAwait(false);
+            deltaStream.Seek(0, SeekOrigin.Begin);
+
+            // Act using the legacy library
+            var progressReporter = Substitute.For<IProgress<FastRsyncLegacy231.Diagnostics.ProgressReport>>();
+            var patchedDataStream = new MemoryStream();
+            var deltaApplier = new FastRsyncLegacy231.Delta.DeltaApplier();
+            await deltaApplier.ApplyAsync(baseDataStream, new FastRsyncLegacy231.Delta.BinaryDeltaReader(deltaStream, progressReporter), patchedDataStream).ConfigureAwait(false);
+
+            // Assert
+            CollectionAssert.AreEqual(baseDataStream.ToArray(), patchedDataStream.ToArray());
+        }
+
         private static async Task<(MemoryStream baseDataStream, MemoryStream baseSignatureStream, byte[] newData, MemoryStream newDataStream)> PrepareTestDataAsync(int baseNumberOfBytes, int newDataNumberOfBytes, Hash.IRollingChecksum rollingChecksumAlg)
         {
             var baseData = new byte[baseNumberOfBytes];

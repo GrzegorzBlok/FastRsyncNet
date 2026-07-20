@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.IO;
 using System.Text.Json;
 using System.Threading;
@@ -13,6 +12,11 @@ namespace FastRsync.Delta
 {
     public class BinaryDeltaReader : IDeltaReader
     {
+        // Buffers the many small reads of the metadata and command headers, which matters when
+        // the delta is a network-backed stream (e.g. Azure Blob). Bulk data-command reads are
+        // larger than this buffer and bypass it, going directly to the underlying stream.
+        private const int StreamBufferSize = 64 * 1024;
+
         private readonly BinaryReader reader;
         private readonly IProgress<ProgressReport> progressReport;
         private byte[] expectedHash;
@@ -22,7 +26,7 @@ namespace FastRsync.Delta
         public BinaryDeltaReader(Stream stream, IProgress<ProgressReport> progressHandler,
             int readBufferSize = 4 * 1024 * 1024)
         {
-            this.reader = new BinaryReader(stream);
+            this.reader = new BinaryReader(new BufferedStream(stream, StreamBufferSize));
             this.progressReport = progressHandler;
             this.readBufferSize = readBufferSize;
         }
@@ -75,13 +79,13 @@ namespace FastRsync.Delta
 
             var header = reader.ReadBytes(BinaryFormat.DeltaFormatHeaderLength);
 
-            if (StructuralComparisons.StructuralEqualityComparer.Equals(FastRsyncBinaryFormat.DeltaHeader, header))
+            if (ByteArrayEquality.AreEqual(FastRsyncBinaryFormat.DeltaHeader, header))
             {
                 ReadFastRsyncDeltaHeader();
                 return;
             }
 
-            if (StructuralComparisons.StructuralEqualityComparer.Equals(OctoBinaryFormat.DeltaHeader, header))
+            if (ByteArrayEquality.AreEqual(OctoBinaryFormat.DeltaHeader, header))
             {
                 ReadOctoDeltaHeader();
                 return;
@@ -102,8 +106,21 @@ namespace FastRsync.Delta
 #else
             _metadata = JsonSerializer.Deserialize<DeltaMetadata>(metadataStr, JsonSerializationSettings.JsonSettings);
 #endif
+
+            if (_metadata == null)
+                throw new InvalidDataException("The delta file appears to be corrupt; the metadata is missing.");
+            if (string.IsNullOrEmpty(_metadata.ExpectedFileHash))
+                throw new InvalidDataException("The delta file appears to be corrupt; the expected file hash is missing.");
+
             hashAlgorithm = SupportedAlgorithms.Hashing.Create(_metadata.HashAlgorithm);
-            expectedHash = Convert.FromBase64String(_metadata.ExpectedFileHash);
+            try
+            {
+                expectedHash = Convert.FromBase64String(_metadata.ExpectedFileHash);
+            }
+            catch (FormatException ex)
+            {
+                throw new InvalidDataException("The delta file appears to be corrupt; the expected file hash is not valid Base64.", ex);
+            }
 
             type = RsyncFormatType.FastRsync;
         }
@@ -118,9 +135,14 @@ namespace FastRsync.Delta
             hashAlgorithm = SupportedAlgorithms.Hashing.Create(hashAlgorithmName);
 
             var hashLength = reader.ReadInt32();
+            var remainingBytes = reader.BaseStream.Length - reader.BaseStream.Position;
+            if (hashLength < 0 || hashLength > remainingBytes)
+                throw new InvalidDataException("The delta file appears to be corrupt; the expected hash length is invalid.");
             expectedHash = reader.ReadBytes(hashLength);
+            if (expectedHash.Length != hashLength)
+                throw new InvalidDataException("The delta file appears to be corrupt; the expected hash is truncated.");
             var endOfMeta = reader.ReadBytes(OctoBinaryFormat.EndOfMetadata.Length);
-            if (!StructuralComparisons.StructuralEqualityComparer.Equals(OctoBinaryFormat.EndOfMetadata, endOfMeta))
+            if (!ByteArrayEquality.AreEqual(OctoBinaryFormat.EndOfMetadata, endOfMeta))
                 throw new InvalidDataException("The delta file appears to be corrupt.");
 
             _metadata = new DeltaMetadata
@@ -156,18 +178,28 @@ namespace FastRsync.Delta
                 {
                     var start = reader.ReadInt64();
                     var length = reader.ReadInt64();
+                    if (start < 0 || length < 0)
+                        throw new InvalidDataException("The delta file appears to be corrupt; a copy command has a negative offset or length.");
                     copy(start, length);
                 }
                 else if (b == BinaryFormat.DataCommand)
                 {
                     var length = reader.ReadInt64();
+                    if (length < 0)
+                        throw new InvalidDataException("The delta file appears to be corrupt; a data command has a negative length.");
                     long soFar = 0;
                     while (soFar < length)
                     {
                         var bytes = reader.ReadBytes((int)Math.Min(length - soFar, readBufferSize));
+                        if (bytes.Length == 0)
+                            throw new InvalidDataException("The delta file appears to be corrupt; a data command is truncated.");
                         soFar += bytes.Length;
                         writeData(bytes);
                     }
+                }
+                else
+                {
+                    throw new InvalidDataException($"The delta file appears to be corrupt; encountered an unknown command 0x{b:X2}.");
                 }
             }
         }
@@ -199,17 +231,23 @@ namespace FastRsync.Delta
                 {
                     var start = reader.ReadInt64();
                     var length = reader.ReadInt64();
+                    if (start < 0 || length < 0)
+                        throw new InvalidDataException("The delta file appears to be corrupt; a copy command has a negative offset or length.");
                     await copy(start, length).ConfigureAwait(false);
                 }
                 else if (b == BinaryFormat.DataCommand)
                 {
                     var length = reader.ReadInt64();
+                    if (length < 0)
+                        throw new InvalidDataException("The delta file appears to be corrupt; a data command has a negative length.");
                     long soFar = 0;
                     while (soFar < length)
                     {
                         var bytesRead = await reader.BaseStream
                             .ReadAsync(buffer, 0, (int)Math.Min(length - soFar, buffer.Length), cancellationToken)
                             .ConfigureAwait(false);
+                        if (bytesRead == 0)
+                            throw new InvalidDataException("The delta file appears to be corrupt; a data command is truncated.");
                         var bytes = buffer;
                         if (bytesRead != buffer.Length)
                         {
@@ -220,6 +258,10 @@ namespace FastRsync.Delta
                         soFar += bytes.Length;
                         await writeData(bytes).ConfigureAwait(false);
                     }
+                }
+                else
+                {
+                    throw new InvalidDataException($"The delta file appears to be corrupt; encountered an unknown command 0x{b:X2}.");
                 }
             }
         }

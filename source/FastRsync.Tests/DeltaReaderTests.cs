@@ -1,4 +1,6 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
+using System.Text;
 using FastRsync.Core;
 using FastRsync.Delta;
 using FastRsync.Signature;
@@ -71,5 +73,94 @@ public class DeltaReaderTests
         Assert.That(target.Metadata.ExpectedFileHash, Is.Not.Null.And.Not.Empty);
         Assert.That(target.Metadata.ExpectedFileHashAlgorithm, Is.EqualTo("MD5"));
         Assert.That(target.Metadata.HashAlgorithm, Is.EqualTo(hashAlgorithm.Name));
+    }
+
+    [Test]
+    public void BinaryDeltaReader_FastRsyncDeltaWithInvalidBase64Hash_ThrowsInvalidDataException()
+    {
+        // Arrange
+        var deltaStream = CreateFastRsyncDeltaStream("!!!not-valid-base64!!!");
+        var target = new BinaryDeltaReader(deltaStream, null);
+
+        // Act & Assert
+        Assert.Throws<InvalidDataException>(() => _ = target.Metadata);
+    }
+
+    [Test]
+    public void BinaryDeltaReader_Apply_UnknownCommandByte_ThrowsInvalidDataException()
+    {
+        // Arrange - valid header followed by a command byte that is neither Copy nor Data.
+        // Before validation was added, unknown commands were silently ignored, allowing
+        // a corrupt or misaligned delta stream to be mis-parsed.
+        var deltaStream = CreateFastRsyncDeltaStream(EmptyMd5Base64, bw => bw.Write((byte)0x42));
+        var target = new BinaryDeltaReader(deltaStream, null);
+
+        // Act & Assert
+        Assert.Throws<InvalidDataException>(() => target.Apply(_ => { }, (_, _) => { }));
+    }
+
+    [Test]
+    public void BinaryDeltaReader_Apply_CopyCommandWithNegativeValues_ThrowsInvalidDataException()
+    {
+        // Arrange - copy command with negative offset and length
+        var deltaStream = CreateFastRsyncDeltaStream(EmptyMd5Base64, bw =>
+        {
+            bw.Write((byte)0x60); // BinaryFormat.CopyCommand
+            bw.Write(-1L);
+            bw.Write(-1L);
+        });
+        var target = new BinaryDeltaReader(deltaStream, null);
+
+        // Act & Assert
+        Assert.Throws<InvalidDataException>(() => target.Apply(_ => { }, (_, _) => { }));
+    }
+
+    [Test]
+    public void BinaryDeltaReader_Apply_TruncatedDataCommand_ThrowsInvalidDataException()
+    {
+        // Arrange - data command declaring 100 bytes but providing only 5.
+        // Before validation was added, this spun forever in the read loop.
+        var deltaStream = CreateFastRsyncDeltaStream(EmptyMd5Base64, bw =>
+        {
+            bw.Write((byte)0x80); // BinaryFormat.DataCommand
+            bw.Write(100L);
+            bw.Write(new byte[] { 1, 2, 3, 4, 5 });
+        });
+        var target = new BinaryDeltaReader(deltaStream, null);
+
+        // Act & Assert
+        Assert.Throws<InvalidDataException>(() => target.Apply(_ => { }, (_, _) => { }));
+    }
+
+    [Test]
+    public void BinaryDeltaReader_ApplyAsync_TruncatedDataCommand_ThrowsInvalidDataException()
+    {
+        // Arrange
+        var deltaStream = CreateFastRsyncDeltaStream(EmptyMd5Base64, bw =>
+        {
+            bw.Write((byte)0x80); // BinaryFormat.DataCommand
+            bw.Write(100L);
+            bw.Write(new byte[] { 1, 2, 3, 4, 5 });
+        });
+        var target = new BinaryDeltaReader(deltaStream, null);
+
+        // Act & Assert
+        Assert.ThrowsAsync<InvalidDataException>(() =>
+            target.ApplyAsync(_ => System.Threading.Tasks.Task.CompletedTask, (_, _) => System.Threading.Tasks.Task.CompletedTask));
+    }
+
+    private static readonly string EmptyMd5Base64 = Convert.ToBase64String(new byte[16]);
+
+    private static MemoryStream CreateFastRsyncDeltaStream(string expectedFileHash, Action<BinaryWriter> writeBody = null)
+    {
+        var deltaStream = new MemoryStream();
+        var writer = new BinaryWriter(deltaStream);
+        writer.Write(Encoding.ASCII.GetBytes("FRSNCDLTA"));
+        writer.Write((byte)0x01);
+        writer.Write($"{{\"hashAlgorithm\":\"XXH64\",\"expectedFileHashAlgorithm\":\"MD5\",\"expectedFileHash\":\"{expectedFileHash}\"}}");
+        writeBody?.Invoke(writer);
+        writer.Flush();
+        deltaStream.Seek(0, SeekOrigin.Begin);
+        return deltaStream;
     }
 }

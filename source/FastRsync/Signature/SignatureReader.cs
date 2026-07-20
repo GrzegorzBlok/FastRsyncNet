@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.IO;
 using System.Text.Json;
 using FastRsync.Core;
@@ -9,13 +8,22 @@ namespace FastRsync.Signature
 {
     public class SignatureReader : ISignatureReader
     {
+        // Chunk records are 14-30 bytes each and are read individually, so a signature of a large
+        // file causes millions of tiny reads. Buffering batches them into large reads, which
+        // matters when the signature is a network-backed stream (e.g. Azure Blob).
+        private const int StreamBufferSize = 64 * 1024;
+
+        // Progress is throttled to once per this many chunks to avoid allocating a report
+        // object for every chunk.
+        private const int ProgressChunkInterval = 1024;
+
         private readonly IProgress<ProgressReport> report;
         private readonly BinaryReader reader;
 
         public SignatureReader(Stream stream, IProgress<ProgressReport> progressHandler)
         {
             this.report = progressHandler;
-            this.reader = new BinaryReader(stream);
+            this.reader = new BinaryReader(new BufferedStream(stream, StreamBufferSize));
         }
 
         public Signature ReadSignature()
@@ -30,12 +38,12 @@ namespace FastRsync.Signature
         {
             var header = reader.ReadBytes(BinaryFormat.SignatureFormatHeaderLength);
 
-            if (StructuralComparisons.StructuralEqualityComparer.Equals(FastRsyncBinaryFormat.SignatureHeader, header))
+            if (ByteArrayEquality.AreEqual(FastRsyncBinaryFormat.SignatureHeader, header))
             {
                 return ReadFastRsyncSignatureHeader();
             }
 
-            if (StructuralComparisons.StructuralEqualityComparer.Equals(OctoBinaryFormat.SignatureHeader, header))
+            if (ByteArrayEquality.AreEqual(OctoBinaryFormat.SignatureHeader, header))
             {
                 return ReadOctoSignatureHeader();
             }
@@ -58,6 +66,10 @@ namespace FastRsync.Signature
             var metadata =
  JsonSerializer.Deserialize<SignatureMetadata>(metadataStr, JsonSerializationSettings.JsonSettings);
 #endif
+
+            if (metadata == null)
+                throw new InvalidDataException("The signature file appears to be corrupt; the metadata is missing.");
+
             var signature = new Signature(metadata, RsyncFormatType.FastRsync);
 
             return signature;
@@ -74,7 +86,7 @@ namespace FastRsync.Signature
             var rollingChecksumAlgorithmName = reader.ReadString();
 
             var endOfMeta = reader.ReadBytes(OctoBinaryFormat.EndOfMetadata.Length);
-            if (!StructuralComparisons.StructuralEqualityComparer.Equals(OctoBinaryFormat.EndOfMetadata, endOfMeta))
+            if (!ByteArrayEquality.AreEqual(OctoBinaryFormat.EndOfMetadata, endOfMeta))
                 throw new InvalidDataException("The signature file appears to be corrupt.");
 
             Progress();
@@ -102,11 +114,16 @@ namespace FastRsync.Signature
                 throw new InvalidDataException(
                     "The signature file appears to be corrupt; at least one chunk has data missing.");
 
+            long chunkCount = 0;
             while (reader.BaseStream.Position < signatureLength - 1)
             {
                 var length = reader.ReadInt16();
+                if (length < 0)
+                    throw new InvalidDataException("The signature file appears to be corrupt; a chunk has a negative length.");
                 var checksum = reader.ReadUInt32();
                 var chunkHash = reader.ReadBytes(expectedHashLength);
+                if (chunkHash.Length != expectedHashLength)
+                    throw new InvalidDataException("The signature file appears to be corrupt; a chunk hash is truncated.");
 
                 signature.Chunks.Add(new ChunkSignature
                 {
@@ -118,8 +135,11 @@ namespace FastRsync.Signature
 
                 start += length;
 
-                Progress();
+                if (++chunkCount % ProgressChunkInterval == 0)
+                    Progress();
             }
+
+            Progress();
         }
 
         private void Progress()

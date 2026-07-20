@@ -49,8 +49,9 @@ namespace FastRsync.Benchmarks
             {
                 var xxHash3SignatureBuilder = new SignatureBuilder(SupportedAlgorithms.Hashing.XxHash3(),
                     SupportedAlgorithms.Checksum.Adler32Rolling());
+                baseDataStream.Seek(0, SeekOrigin.Begin);
                 baseSignatureXxHash3Stream = new MemoryStream();
-                xxHash3SignatureBuilder.Build(baseDataStream, new SignatureWriter(baseSignatureXxHashStream));
+                xxHash3SignatureBuilder.Build(baseDataStream, new SignatureWriter(baseSignatureXxHash3Stream));
             }
 
             {

@@ -12,6 +12,7 @@ namespace FastRsync.Delta
         private readonly Stream deltaStream;
         private readonly BinaryWriter writer;
         private readonly int readWriteBufferSize;
+        private byte[] dataCommandBuffer;
 
         public BinaryDeltaWriter(Stream stream, int readWriteBufferSize = 1024 * 1024)
         {
@@ -49,7 +50,11 @@ namespace FastRsync.Delta
             {
                 source.Seek(offset, SeekOrigin.Begin);
 
-                var buffer = new byte[(int)Math.Min(length, readWriteBufferSize)];
+                // Reused across data commands; deltas of heavily changed files write many of them.
+                var bufferSize = (int)Math.Min(length, readWriteBufferSize);
+                if (dataCommandBuffer == null || dataCommandBuffer.Length < bufferSize)
+                    dataCommandBuffer = new byte[bufferSize];
+                var buffer = dataCommandBuffer;
 
                 int read;
                 long soFar = 0;
@@ -76,7 +81,11 @@ namespace FastRsync.Delta
             {
                 source.Seek(offset, SeekOrigin.Begin);
 
-                var buffer = new byte[(int)Math.Min(length, readWriteBufferSize)];
+                // Reused across data commands; deltas of heavily changed files write many of them.
+                var bufferSize = (int)Math.Min(length, readWriteBufferSize);
+                if (dataCommandBuffer == null || dataCommandBuffer.Length < bufferSize)
+                    dataCommandBuffer = new byte[bufferSize];
+                var buffer = dataCommandBuffer;
 
                 int read;
                 long soFar = 0;
