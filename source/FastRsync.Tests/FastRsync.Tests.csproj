@@ -44,7 +44,7 @@
     <ProjectReference Include="..\FastRsync\FastRsync.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Bcl.Memory" Version="10.0.1" Condition="'$(TargetFramework)' == 'net472'" />
+    <PackageReference Include="Microsoft.Bcl.Memory" Version="10.0.4" Condition="'$(TargetFramework)' == 'net472'" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="NSubstitute" Version="5.3.0" />
     <PackageReference Include="NUnit" Version="4.4.0" />

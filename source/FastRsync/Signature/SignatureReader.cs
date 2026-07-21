@@ -8,9 +8,7 @@ namespace FastRsync.Signature
 {
     public class SignatureReader : ISignatureReader
     {
-        // Chunk records are 14-30 bytes each and are read individually, so a signature of a large
-        // file causes millions of tiny reads. Buffering batches them into large reads, which
-        // matters when the signature is a network-backed stream (e.g. Azure Blob).
+        // Buffer size used when reading the chunk records; see ReadChunks.
         private const int StreamBufferSize = 64 * 1024;
 
         // Progress is throttled to once per this many chunks to avoid allocating a report
@@ -22,8 +20,11 @@ namespace FastRsync.Signature
 
         public SignatureReader(Stream stream, IProgress<ProgressReport> progressHandler)
         {
+            // The reader must operate directly on the caller's stream (no read-ahead
+            // buffering here): callers legitimately reposition the underlying stream between
+            // ReadSignatureMetadata and ReadSignature calls, and the reader has to observe that.
             this.report = progressHandler;
-            this.reader = new BinaryReader(new BufferedStream(stream, StreamBufferSize));
+            this.reader = new BinaryReader(stream);
         }
 
         public Signature ReadSignature()
@@ -114,14 +115,21 @@ namespace FastRsync.Signature
                 throw new InvalidDataException(
                     "The signature file appears to be corrupt; at least one chunk has data missing.");
 
+            // Chunk records are 14-30 bytes each and are read individually, so a signature of
+            // a large file causes millions of tiny reads; buffering batches them into large
+            // reads, which matters when the signature is a network-backed stream (e.g. Azure
+            // Blob). The buffering is scoped to this method because the chunk section is
+            // always consumed to the end of the stream, which keeps it invisible to callers.
+            var chunkReader = new BinaryReader(new BufferedStream(reader.BaseStream, StreamBufferSize));
+
             long chunkCount = 0;
-            while (reader.BaseStream.Position < signatureLength - 1)
+            while (chunkReader.BaseStream.Position < signatureLength - 1)
             {
-                var length = reader.ReadInt16();
+                var length = chunkReader.ReadInt16();
                 if (length < 0)
                     throw new InvalidDataException("The signature file appears to be corrupt; a chunk has a negative length.");
-                var checksum = reader.ReadUInt32();
-                var chunkHash = reader.ReadBytes(expectedHashLength);
+                var checksum = chunkReader.ReadUInt32();
+                var chunkHash = chunkReader.ReadBytes(expectedHashLength);
                 if (chunkHash.Length != expectedHashLength)
                     throw new InvalidDataException("The signature file appears to be corrupt; a chunk hash is truncated.");
 
@@ -136,19 +144,24 @@ namespace FastRsync.Signature
                 start += length;
 
                 if (++chunkCount % ProgressChunkInterval == 0)
-                    Progress();
+                    Progress(chunkReader.BaseStream);
             }
 
-            Progress();
+            Progress(chunkReader.BaseStream);
         }
 
         private void Progress()
         {
+            Progress(reader.BaseStream);
+        }
+
+        private void Progress(Stream stream)
+        {
             report?.Report(new ProgressReport
             {
                 Operation = ProgressOperationType.ReadingSignature,
-                CurrentPosition = reader.BaseStream.Position,
-                Total = reader.BaseStream.Length
+                CurrentPosition = stream.Position,
+                Total = stream.Length
             });
         }
     }

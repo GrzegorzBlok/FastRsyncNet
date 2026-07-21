@@ -108,6 +108,29 @@ public class DeltaBuilderTests
     }
 
     [Test]
+    public async Task BuildDeltaAsync_WithReusedSignatureReaderAfterExternalSeek_BuildsValidDelta()
+    {
+        // Regression test mirroring a real-world handler: read the signature metadata for
+        // validation, seek the signature stream back to the start, then hand the same reader
+        // instance to BuildDeltaAsync.
+        var (baseDataStream, baseSignatureStream, newData, newDataStream) = Utils.PrepareTestData(16974, 8452, SignatureBuilder.DefaultChunkSize);
+
+        var signatureReader = new SignatureReader(baseSignatureStream, null);
+        var metadata = signatureReader.ReadSignatureMetadata();
+        Assert.That(metadata.Metadata.BaseFileHash, Is.Not.Null.And.Not.Empty);
+
+        baseSignatureStream.Seek(0, SeekOrigin.Begin);
+
+        var deltaStream = new MemoryStream();
+        await new DeltaBuilder().BuildDeltaAsync(newDataStream, signatureReader, new AggregateCopyOperationsDecorator(new BinaryDeltaWriter(deltaStream)));
+        deltaStream.Seek(0, SeekOrigin.Begin);
+
+        var patchedDataStream = new MemoryStream();
+        await new DeltaApplier().ApplyAsync(baseDataStream, new BinaryDeltaReader(deltaStream, null), patchedDataStream);
+        CollectionAssert.AreEqual(newData, patchedDataStream.ToArray());
+    }
+
+    [Test]
     public void BuildDelta_WritesBaseAndTargetFileLengthMetadata()
     {
         // Arrange

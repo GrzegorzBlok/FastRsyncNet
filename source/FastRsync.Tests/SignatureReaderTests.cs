@@ -53,6 +53,25 @@ public class SignatureReaderTests
     }
 
     [Test]
+    public void SignatureReader_ReuseAfterExternalSeek_ReadsSignature()
+    {
+        // Regression test: callers peek at the metadata first (e.g. to validate the base file
+        // hash), seek the underlying stream back to the beginning themselves, and then reuse
+        // the same reader instance for the full read. The reader must observe the external
+        // repositioning of the stream.
+        var (_, baseSignatureStream, _, _) = Utils.PrepareTestData(16974, 0, SignatureBuilder.DefaultChunkSize);
+
+        var target = new SignatureReader(baseSignatureStream, null);
+        var metadata = target.ReadSignatureMetadata();
+        Assert.That(metadata.Metadata.BaseFileHash, Is.Not.Null.And.Not.Empty);
+
+        baseSignatureStream.Seek(0, SeekOrigin.Begin);
+        var signature = target.ReadSignature();
+
+        Assert.That(signature.Chunks, Has.Count.EqualTo((16974 + SignatureBuilder.DefaultChunkSize - 1) / SignatureBuilder.DefaultChunkSize));
+    }
+
+    [Test]
     public void SignatureReader_ChunkWithNegativeLength_ThrowsInvalidDataException()
     {
         // Arrange - valid FastRsync signature header followed by a chunk whose Int16 length

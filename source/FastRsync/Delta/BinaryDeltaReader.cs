@@ -12,9 +12,7 @@ namespace FastRsync.Delta
 {
     public class BinaryDeltaReader : IDeltaReader
     {
-        // Buffers the many small reads of the metadata and command headers, which matters when
-        // the delta is a network-backed stream (e.g. Azure Blob). Bulk data-command reads are
-        // larger than this buffer and bypass it, going directly to the underlying stream.
+        // Buffer size used when reading the delta commands; see Apply.
         private const int StreamBufferSize = 64 * 1024;
 
         private readonly BinaryReader reader;
@@ -26,7 +24,10 @@ namespace FastRsync.Delta
         public BinaryDeltaReader(Stream stream, IProgress<ProgressReport> progressHandler,
             int readBufferSize = 4 * 1024 * 1024)
         {
-            this.reader = new BinaryReader(new BufferedStream(stream, StreamBufferSize));
+            // The reader must operate directly on the caller's stream (no read-ahead
+            // buffering here) so that repositioning the underlying stream between calls
+            // remains visible to the reader, as it was in earlier versions.
+            this.reader = new BinaryReader(stream);
             this.progressReport = progressHandler;
             this.readBufferSize = readBufferSize;
         }
@@ -163,34 +164,41 @@ namespace FastRsync.Delta
 
             ReadMetadata();
 
-            while (reader.BaseStream.Position != fileLength)
+            // Command headers are tiny reads while data payloads are larger than the buffer
+            // and bypass it, so buffering here batches the small reads (a win for
+            // network-backed delta streams). The buffering is scoped to this method because
+            // the command section is always consumed to the end of the stream, which keeps
+            // it invisible to callers.
+            var commandReader = new BinaryReader(new BufferedStream(reader.BaseStream, StreamBufferSize));
+
+            while (commandReader.BaseStream.Position != fileLength)
             {
-                var b = reader.ReadByte();
+                var b = commandReader.ReadByte();
 
                 progressReport?.Report(new ProgressReport
                 {
                     Operation = ProgressOperationType.ApplyingDelta,
-                    CurrentPosition = reader.BaseStream.Position,
+                    CurrentPosition = commandReader.BaseStream.Position,
                     Total = fileLength
                 });
 
                 if (b == BinaryFormat.CopyCommand)
                 {
-                    var start = reader.ReadInt64();
-                    var length = reader.ReadInt64();
+                    var start = commandReader.ReadInt64();
+                    var length = commandReader.ReadInt64();
                     if (start < 0 || length < 0)
                         throw new InvalidDataException("The delta file appears to be corrupt; a copy command has a negative offset or length.");
                     copy(start, length);
                 }
                 else if (b == BinaryFormat.DataCommand)
                 {
-                    var length = reader.ReadInt64();
+                    var length = commandReader.ReadInt64();
                     if (length < 0)
                         throw new InvalidDataException("The delta file appears to be corrupt; a data command has a negative length.");
                     long soFar = 0;
                     while (soFar < length)
                     {
-                        var bytes = reader.ReadBytes((int)Math.Min(length - soFar, readBufferSize));
+                        var bytes = commandReader.ReadBytes((int)Math.Min(length - soFar, readBufferSize));
                         if (bytes.Length == 0)
                             throw new InvalidDataException("The delta file appears to be corrupt; a data command is truncated.");
                         soFar += bytes.Length;
@@ -216,34 +224,37 @@ namespace FastRsync.Delta
 
             var buffer = new byte[readBufferSize];
 
-            while (reader.BaseStream.Position != fileLength)
+            // See the comment in Apply: buffering is scoped to the command section.
+            var commandReader = new BinaryReader(new BufferedStream(reader.BaseStream, StreamBufferSize));
+
+            while (commandReader.BaseStream.Position != fileLength)
             {
-                var b = reader.ReadByte();
+                var b = commandReader.ReadByte();
 
                 progressReport?.Report(new ProgressReport
                 {
                     Operation = ProgressOperationType.ApplyingDelta,
-                    CurrentPosition = reader.BaseStream.Position,
+                    CurrentPosition = commandReader.BaseStream.Position,
                     Total = fileLength
                 });
 
                 if (b == BinaryFormat.CopyCommand)
                 {
-                    var start = reader.ReadInt64();
-                    var length = reader.ReadInt64();
+                    var start = commandReader.ReadInt64();
+                    var length = commandReader.ReadInt64();
                     if (start < 0 || length < 0)
                         throw new InvalidDataException("The delta file appears to be corrupt; a copy command has a negative offset or length.");
                     await copy(start, length).ConfigureAwait(false);
                 }
                 else if (b == BinaryFormat.DataCommand)
                 {
-                    var length = reader.ReadInt64();
+                    var length = commandReader.ReadInt64();
                     if (length < 0)
                         throw new InvalidDataException("The delta file appears to be corrupt; a data command has a negative length.");
                     long soFar = 0;
                     while (soFar < length)
                     {
-                        var bytesRead = await reader.BaseStream
+                        var bytesRead = await commandReader.BaseStream
                             .ReadAsync(buffer, 0, (int)Math.Min(length - soFar, buffer.Length), cancellationToken)
                             .ConfigureAwait(false);
                         if (bytesRead == 0)
