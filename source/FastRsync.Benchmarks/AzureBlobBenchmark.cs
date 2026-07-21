@@ -20,10 +20,8 @@ namespace FastRsync.Benchmarks
         private const int BaseFileSize = 8 * 1024 * 1024;
         private const int NewFileTailSize = 128 * 1024;
 
-        // SDK-side download buffer of BlobOpenReadOptions. 4 MB is the SDK default;
-        // 64 KB simulates a memory-constrained or chatty configuration.
-        [Params(4 * 1024 * 1024, 64 * 1024)]
-        public int BlobReadBufferSize { get; set; }
+        // SDK-side download buffer of BlobOpenReadOptions; 4 MB is the SDK default.
+        private const int BlobReadBufferSize = 4 * 1024 * 1024;
 
         private BlockBlobClient baseBlob;
         private BlockBlobClient signatureBlob;
@@ -72,13 +70,26 @@ namespace FastRsync.Benchmarks
             return blob.OpenRead(new BlobOpenReadOptions(false) { BufferSize = BlobReadBufferSize });
         }
 
+        // Single-pass reads the base blob once (hash computed incrementally while chunking);
+        // two-pass is the historical behavior that downloads the blob twice.
         [Benchmark]
-        public long BuildSignatureFromBlob()
+        public long BuildSignatureFromBlobSinglePass()
         {
             using (var baseStream = OpenRead(baseBlob))
             {
                 var output = new MemoryStream();
-                new SignatureBuilder().Build(baseStream, new SignatureWriter(output));
+                new SignatureBuilder { SinglePassBuild = true }.Build(baseStream, new SignatureWriter(output));
+                return output.Length;
+            }
+        }
+
+        [Benchmark]
+        public long BuildSignatureFromBlobTwoPass()
+        {
+            using (var baseStream = OpenRead(baseBlob))
+            {
+                var output = new MemoryStream();
+                new SignatureBuilder { SinglePassBuild = false }.Build(baseStream, new SignatureWriter(output));
                 return output.Length;
             }
         }

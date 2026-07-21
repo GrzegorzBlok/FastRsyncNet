@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Threading;
@@ -5,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace FastRsync.Hash
 {
-    public class CryptographyHashAlgorithmWrapper : IHashAlgorithm
+    public class CryptographyHashAlgorithmWrapper : IHashAlgorithm, IDisposable
     {
         private readonly HashAlgorithm algorithm;
 
@@ -35,6 +36,11 @@ namespace FastRsync.Hash
         public byte[] ComputeHash(byte[] buffer, int offset, int length)
         {
             return algorithm.ComputeHash(buffer, offset, length);
+        }
+
+        public void Dispose()
+        {
+            algorithm.Dispose();
         }
     }
 }

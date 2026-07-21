@@ -2,6 +2,7 @@
 using System.IO;
 using System.Threading.Tasks;
 using FastRsync.Core;
+using FastRsync.Delta;
 using FastRsync.Diagnostics;
 using FastRsync.Hash;
 using FastRsync.Signature;
@@ -16,9 +17,23 @@ public class SignatureBuilderTests
 {
     private const int RandomSeed = 123;
 
-    private readonly byte[] xxhash1037TestSignature = {
-        0x46, 0x52, 0x53, 0x4E, 0x43, 0x53, 0x47, 0x01, 0x8B, 0x01, 0x7B, 0x22, 0x63, 0x68, 0x75, 0x6E, 0x6B, 0x48, 0x61, 0x73, 0x68, 0x41, 0x6C, 0x67, 0x6F, 0x72, 0x69, 0x74, 0x68, 0x6D, 0x22, 0x3A, 0x22, 0x58, 0x58, 0x48, 0x36, 0x34, 0x22, 0x2C, 0x22, 0x72, 0x6F, 0x6C, 0x6C, 0x69, 0x6E, 0x67, 0x43, 0x68, 0x65, 0x63, 0x6B, 0x73, 0x75, 0x6D, 0x41, 0x6C, 0x67, 0x6F, 0x72, 0x69, 0x74, 0x68, 0x6D, 0x22, 0x3A, 0x22, 0x41, 0x64, 0x6C, 0x65, 0x72, 0x33, 0x32, 0x22, 0x2C, 0x22, 0x62, 0x61, 0x73, 0x65, 0x46, 0x69, 0x6C, 0x65, 0x48, 0x61, 0x73, 0x68, 0x41, 0x6C, 0x67, 0x6F, 0x72, 0x69, 0x74, 0x68, 0x6D, 0x22, 0x3A, 0x22, 0x4D, 0x44, 0x35, 0x22, 0x2C, 0x22, 0x62, 0x61, 0x73, 0x65, 0x46, 0x69, 0x6C, 0x65, 0x48, 0x61, 0x73, 0x68, 0x22, 0x3A, 0x22, 0x41, 0x33, 0x37, 0x45, 0x79, 0x65, 0x6A, 0x4E, 0x6E, 0x4B, 0x6F, 0x6C, 0x62, 0x68, 0x64, 0x34, 0x68, 0x73, 0x6F, 0x4E, 0x6F, 0x51, 0x3D, 0x3D, 0x22, 0x7D, 0x0D, 0x04, 0x2F, 0xFC, 0xF4, 0x6C, 0x7B, 0x52, 0x06, 0x17, 0x0A, 0x90, 0x3D, 0x70
-    };
+    // The exact expected signature for the 1037-byte seeded test data: FRSNCSG header with
+    // version 0x01, the length-prefixed metadata JSON, and one chunk record (Int16 length 1037,
+    // UInt32 Adler32 checksum, 8-byte xxHash64). Guards the on-disk format against accidental
+    // changes; update deliberately when the format legitimately evolves.
+    private const string Xxhash1037TestSignatureMetadataJson =
+        "{\"chunkHashAlgorithm\":\"XXH64\",\"rollingChecksumAlgorithm\":\"Adler32\",\"baseFileHashAlgorithm\":\"MD5\",\"baseFileHash\":\"A37EyejNnKolbhd4hsoNoQ==\",\"baseFileLength\":1037}";
+
+    private static byte[] BuildExpectedXxhash1037TestSignature()
+    {
+        var ms = new MemoryStream();
+        var writer = new BinaryWriter(ms);
+        writer.Write(new byte[] { 0x46, 0x52, 0x53, 0x4E, 0x43, 0x53, 0x47, 0x01 }); // "FRSNCSG" + version
+        writer.Write(Xxhash1037TestSignatureMetadataJson); // BinaryWriter length-prefixed string
+        writer.Write(new byte[] { 0x0D, 0x04, 0x2F, 0xFC, 0xF4, 0x6C, 0x7B, 0x52, 0x06, 0x17, 0x0A, 0x90, 0x3D, 0x70 });
+        writer.Flush();
+        return ms.ToArray();
+    }
 
     [Test]
     public void SignatureBuilderXXHash_BuildsSignature()
@@ -40,7 +55,7 @@ public class SignatureBuilderTests
         target.Build(dataStream, new SignatureWriter(signatureStream));
 
         // Assert
-        CollectionAssert.AreEqual(xxhash1037TestSignature, signatureStream.ToArray());
+        CollectionAssert.AreEqual(BuildExpectedXxhash1037TestSignature(), signatureStream.ToArray());
 
         CommonAsserts.ValidateSignature(signatureStream, SupportedAlgorithms.Hashing.XxHash(), Utils.GetMd5(data), new Adler32RollingChecksum());
 
@@ -67,11 +82,80 @@ public class SignatureBuilderTests
         await target.BuildAsync(dataStream, new SignatureWriter(signatureStream)).ConfigureAwait(false);
 
         // Assert
-        CollectionAssert.AreEqual(xxhash1037TestSignature, signatureStream.ToArray());
+        CollectionAssert.AreEqual(BuildExpectedXxhash1037TestSignature(), signatureStream.ToArray());
 
         CommonAsserts.ValidateSignature(signatureStream, SupportedAlgorithms.Hashing.XxHash(), Utils.GetMd5(data), new Adler32RollingChecksum());
 
         progressReporter.Received().Report(Arg.Any<ProgressReport>());
+    }
+
+    [Test]
+    [TestCase(0)]
+    [TestCase(1037)]
+    [TestCase(16974)]
+    public void SignatureBuilder_SinglePassAndTwoPass_ProduceIdenticalSignature(int dataLength)
+    {
+        // Arrange
+        var data = new byte[dataLength];
+        new Random(RandomSeed).NextBytes(data);
+
+        // Act
+        var singlePassStream = new MemoryStream();
+        new SignatureBuilder { SinglePassBuild = true }.Build(new MemoryStream(data), new SignatureWriter(singlePassStream));
+
+        var twoPassStream = new MemoryStream();
+        new SignatureBuilder { SinglePassBuild = false }.Build(new MemoryStream(data), new SignatureWriter(twoPassStream));
+
+        // Assert
+        CollectionAssert.AreEqual(twoPassStream.ToArray(), singlePassStream.ToArray());
+    }
+
+    [Test]
+    [TestCase(true)]
+    [TestCase(false)]
+    public void SignatureBuilder_WritesBaseFileLengthMetadata(bool singlePassBuild)
+    {
+        // Arrange
+        const int dataLength = 16974;
+        var data = new byte[dataLength];
+        new Random(RandomSeed).NextBytes(data);
+        var signatureStream = new MemoryStream();
+
+        // Act
+        var target = new SignatureBuilder { SinglePassBuild = singlePassBuild };
+        target.Build(new MemoryStream(data), new SignatureWriter(signatureStream));
+
+        // Assert
+        signatureStream.Seek(0, SeekOrigin.Begin);
+        var signature = new SignatureReader(signatureStream, null).ReadSignature();
+        Assert.That(signature.Metadata.BaseFileLength, Is.EqualTo(dataLength));
+    }
+
+    [Test]
+    public void SignatureBuilder_TwoPassBuild_ForNewData_PatchesFile()
+    {
+        // Arrange - the default is single-pass; keep the two-pass mode covered end to end
+        var baseData = new byte[16974];
+        new Random(RandomSeed).NextBytes(baseData);
+        var baseDataStream = new MemoryStream(baseData);
+        var signatureStream = new MemoryStream();
+        new SignatureBuilder { SinglePassBuild = false }.Build(baseDataStream, new SignatureWriter(signatureStream));
+        signatureStream.Seek(0, SeekOrigin.Begin);
+
+        var newData = new byte[8452];
+        new Random(RandomSeed + 1).NextBytes(newData);
+        var newDataStream = new MemoryStream(newData);
+
+        // Act
+        var deltaStream = new MemoryStream();
+        new DeltaBuilder().BuildDelta(newDataStream, new SignatureReader(signatureStream, null), new AggregateCopyOperationsDecorator(new BinaryDeltaWriter(deltaStream)));
+        deltaStream.Seek(0, SeekOrigin.Begin);
+
+        var patchedDataStream = new MemoryStream();
+        new DeltaApplier().Apply(baseDataStream, new BinaryDeltaReader(deltaStream, null), patchedDataStream);
+
+        // Assert
+        CollectionAssert.AreEqual(newData, patchedDataStream.ToArray());
     }
 
     [Test]

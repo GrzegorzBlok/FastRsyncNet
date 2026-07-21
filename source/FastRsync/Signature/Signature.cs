@@ -10,6 +10,12 @@ namespace FastRsync.Signature
         public string RollingChecksumAlgorithm { get; set; }
         public string BaseFileHashAlgorithm { get; set; }
         public string BaseFileHash { get; set; }
+
+        /// <summary>
+        /// Length in bytes of the base file the signature was created from, or null when the
+        /// signature was produced by an older version or uses the legacy Octodiff format.
+        /// </summary>
+        public long? BaseFileLength { get; set; }
     }
 
     public enum RsyncFormatType

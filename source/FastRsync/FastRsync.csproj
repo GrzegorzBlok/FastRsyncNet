@@ -10,15 +10,22 @@
     <PackageProjectUrl>https://github.com/GrzegorzBlok/FastRsyncNet</PackageProjectUrl>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
-    <AssemblyVersion>2.4.5</AssemblyVersion>
-    <FileVersion>2.4.5</FileVersion>
-    <Version>2.4.5</Version>
+    <AssemblyVersion>2.4.6</AssemblyVersion>
+    <FileVersion>2.4.6</FileVersion>
+    <Version>2.4.6</Version>
     <PackageTags>sync;rsync;synchronization</PackageTags>
     <Description>
       .NET library for file synchronization based on Rsync algorithm. Optimized for speed and data size to achieve best network performance.
 
       You may also want to check [FastRsyncNet.Compression](https://www.nuget.org/packages/FastRsyncNet.Compression).
     </Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/GrzegorzBlok/FastRsyncNet</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -30,7 +37,7 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
+    <DebugType>portable</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
@@ -41,6 +48,9 @@
     <PackageReference Include="System.Text.Json" Version="8.0.5"/>
     <PackageReference Include="System.IO.Hashing" Version="8.0.0"/>
     <PackageReference Include="System.Memory" Version="4.6.0" Condition="'$(TargetFramework)' != 'net7.0'"/>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\"/>
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Properties\"/>

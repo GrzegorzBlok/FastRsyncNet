@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Threading.Tasks;
 using FastRsync.Core;
@@ -98,6 +99,32 @@ public class DeltaBuilderTests
         var patchedDataStream = new MemoryStream();
         new DeltaApplier().Apply(baseDataStream, new BinaryDeltaReader(deltaStream, null), patchedDataStream);
         Assert.That(patchedDataStream.Length, Is.EqualTo(0));
+    }
+
+    [Test]
+    public void DeltaBuilder_ReadBufferSmallerThanMaximumChunkSize_ThrowsArgumentOutOfRangeException()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new DeltaBuilder(16 * 1024));
+    }
+
+    [Test]
+    public void BuildDelta_WritesBaseAndTargetFileLengthMetadata()
+    {
+        // Arrange
+        const int baseNumberOfBytes = 16974;
+        const int newDataNumberOfBytes = 8452;
+        var (_, baseSignatureStream, _, newDataStream) = Utils.PrepareTestData(baseNumberOfBytes, newDataNumberOfBytes, SignatureBuilder.DefaultChunkSize);
+
+        // Act
+        var deltaStream = new MemoryStream();
+        var deltaBuilder = new DeltaBuilder();
+        deltaBuilder.BuildDelta(newDataStream, new SignatureReader(baseSignatureStream, null), new AggregateCopyOperationsDecorator(new BinaryDeltaWriter(deltaStream)));
+        deltaStream.Seek(0, SeekOrigin.Begin);
+
+        // Assert
+        var reader = new BinaryDeltaReader(deltaStream, null);
+        Assert.That(reader.Metadata.BaseFileLength, Is.EqualTo(baseNumberOfBytes));
+        Assert.That(reader.Metadata.TargetFileLength, Is.EqualTo(newDataNumberOfBytes));
     }
 
     [Test]

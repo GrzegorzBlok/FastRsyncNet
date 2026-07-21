@@ -118,6 +118,43 @@ namespace FastRsync.BackwardCompatibilityTests
             CollectionAssert.AreEqual(baseDataStream.ToArray(), patchedDataStream.ToArray());
         }
 
+        [Test]
+        [TestCase(1378, 129)]
+        [TestCase(137800, 1290)]
+        public async Task NewLibraryBuildsDeltaFromLegacySignatureAndAppliesIt(int baseNumberOfBytes, int newDataNumberOfBytes)
+        {
+            // Arrange - signature produced by FastRsync 2.3.1, whose metadata carries no
+            // baseFileLength field. The current DeltaBuilder must handle that gracefully.
+            var baseData = new byte[baseNumberOfBytes];
+            new Random().NextBytes(baseData);
+            var baseDataStream = new MemoryStream(baseData);
+            var baseSignatureStream = new MemoryStream();
+
+            var legacySignatureBuilder = new FastRsyncLegacy231.Signature.SignatureBuilder();
+            legacySignatureBuilder.Build(baseDataStream, new FastRsyncLegacy231.Signature.SignatureWriter(baseSignatureStream));
+            baseSignatureStream.Seek(0, SeekOrigin.Begin);
+
+            var newData = new byte[newDataNumberOfBytes];
+            new Random().NextBytes(newData);
+            var newDataStream = new MemoryStream(newData);
+
+            // Act - delta built and applied with the current library
+            var deltaStream = new MemoryStream();
+            var deltaBuilder = new DeltaBuilder();
+            await deltaBuilder.BuildDeltaAsync(newDataStream, new SignatureReader(baseSignatureStream, null), new AggregateCopyOperationsDecorator(new BinaryDeltaWriter(deltaStream))).ConfigureAwait(false);
+            deltaStream.Seek(0, SeekOrigin.Begin);
+
+            var deltaReader = new BinaryDeltaReader(deltaStream, null);
+            var patchedDataStream = new MemoryStream();
+            var deltaApplier = new DeltaApplier();
+            await deltaApplier.ApplyAsync(baseDataStream, deltaReader, patchedDataStream).ConfigureAwait(false);
+
+            // Assert
+            CollectionAssert.AreEqual(newData, patchedDataStream.ToArray());
+            Assert.That(deltaReader.Metadata.BaseFileLength, Is.Null);
+            Assert.That(deltaReader.Metadata.TargetFileLength, Is.EqualTo(newDataNumberOfBytes));
+        }
+
         private static async Task<(MemoryStream baseDataStream, MemoryStream baseSignatureStream, byte[] newData, MemoryStream newDataStream)> PrepareTestDataAsync(int baseNumberOfBytes, int newDataNumberOfBytes, Hash.IRollingChecksum rollingChecksumAlg)
         {
             var baseData = new byte[baseNumberOfBytes];

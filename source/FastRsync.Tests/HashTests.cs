@@ -87,8 +87,8 @@ public class HashTests
         var azureBlob = azureBlobContainerClient.GetBlockBlobClient("XxHash64StreamBackwardCompatibility_" + dataLength);
         await azureBlob.UploadAsync(streamdata);
 
-        await using var blobstreamDataXxHash = await azureBlob.OpenReadAsync();
-        await using var blobstreamSystemXxHash = await azureBlob.OpenReadAsync();
+        using var blobstreamDataXxHash = await azureBlob.OpenReadAsync();
+        using var blobstreamSystemXxHash = await azureBlob.OpenReadAsync();
 
         // Act
         var dataXxHash = xxHashFactory.Instance.Create(new xxHashConfig

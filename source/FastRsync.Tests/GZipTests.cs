@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.IO.Compression;
 using System.Threading;
@@ -97,8 +97,9 @@ public class GZipTests
         // Main flow
         var deltaStream = FullCompressedRsyncFlow(basisStream, newFileStream);
 
-        // Not calculated, taken from the valid flow
-        Assert.That(deltaStream.Length, Is.EqualTo(662628));
+        // Not calculated, taken from the valid flow. Grew by 52 bytes when the delta
+        // metadata gained the baseFileLength and targetFileLength fields.
+        Assert.That(deltaStream.Length, Is.EqualTo(662680));
     }
 
     private static MemoryStream FullCompressedRsyncFlow(MemoryStream basisStream, MemoryStream newFileStream)
@@ -184,8 +185,9 @@ public class GZipTests
         // Main flow
         var deltaStream = await FullCompressedRsyncFlowAsync(basisStream, newFileStream);
 
-        // Not calculated, taken from the valid flow
-        Assert.That(deltaStream.Length, Is.EqualTo(662628));
+        // Not calculated, taken from the valid flow. Grew by 52 bytes when the delta
+        // metadata gained the baseFileLength and targetFileLength fields.
+        Assert.That(deltaStream.Length, Is.EqualTo(662680));
     }
 
     private static async Task<MemoryStream> FullCompressedRsyncFlowAsync(MemoryStream basisStream, MemoryStream newFileStream)
@@ -228,7 +230,7 @@ public class GZipTests
 
         patchedCompressedStream.Seek(0, SeekOrigin.Begin);
         var decompressedStream = new MemoryStream();
-        await using (var gz = new GZipStream(patchedCompressedStream, CompressionMode.Decompress))
+        using (var gz = new GZipStream(patchedCompressedStream, CompressionMode.Decompress))
         {
             await gz.CopyToAsync(decompressedStream);
         }

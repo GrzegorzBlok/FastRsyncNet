@@ -15,6 +15,12 @@ namespace FastRsync.Delta
 
         public DeltaBuilder(int readBufferSize = 4 * 1024 * 1024)
         {
+            // The scan window is repositioned by the largest chunk size found in the signature,
+            // so the buffer must be able to hold at least one whole chunk of any legal size.
+            if (readBufferSize < SignatureBuilder.MaximumChunkSize)
+                throw new ArgumentOutOfRangeException(nameof(readBufferSize),
+                    $"Read buffer size must be at least {SignatureBuilder.MaximumChunkSize} bytes.");
+
             ProgressReport = null;
             this.readBufferSize = readBufferSize;
         }
@@ -38,19 +44,24 @@ namespace FastRsync.Delta
             newFileStream.Seek(0, SeekOrigin.Begin);
             var newFileHash = newFileVerificationHashAlgorithm.ComputeHash(newFileStream);
             newFileStream.Seek(0, SeekOrigin.Begin);
+            var newFileHashAlgorithmName = newFileVerificationHashAlgorithm.Name;
+            // MD5 instances hold disposable resources and are only needed for the hash above.
+            (newFileVerificationHashAlgorithm as IDisposable)?.Dispose();
 
             var signature = signatureReader.ReadSignature();
 
             var deltaMetadata = new DeltaMetadata
             {
                 HashAlgorithm = signature.HashAlgorithm.Name,
-                ExpectedFileHashAlgorithm = newFileVerificationHashAlgorithm.Name,
+                ExpectedFileHashAlgorithm = newFileHashAlgorithmName,
                 ExpectedFileHash = Convert.ToBase64String(newFileHash),
                 BaseFileHash = signature.Metadata.BaseFileHash,
-                BaseFileHashAlgorithm = signature.Metadata.BaseFileHashAlgorithm
+                BaseFileHashAlgorithm = signature.Metadata.BaseFileHashAlgorithm,
+                BaseFileLength = signature.Metadata.BaseFileLength,
+                TargetFileLength = newFileStream.Length
             };
 
-            if (SkipDeltaIfHashesMatch && BaseFileHashMatches(signature.Metadata, newFileHash, newFileVerificationHashAlgorithm.Name))
+            if (SkipDeltaIfHashesMatch && BaseFileHashMatches(signature.Metadata, newFileHash, newFileHashAlgorithmName))
             {
                 WriteUnchangedFileDelta(signature, deltaMetadata, deltaWriter);
                 return;
@@ -166,19 +177,24 @@ namespace FastRsync.Delta
             newFileStream.Seek(0, SeekOrigin.Begin);
             var newFileHash = await newFileVerificationHashAlgorithm.ComputeHashAsync(newFileStream, cancellationToken).ConfigureAwait(false);
             newFileStream.Seek(0, SeekOrigin.Begin);
+            var newFileHashAlgorithmName = newFileVerificationHashAlgorithm.Name;
+            // MD5 instances hold disposable resources and are only needed for the hash above.
+            (newFileVerificationHashAlgorithm as IDisposable)?.Dispose();
 
             var signature = signatureReader.ReadSignature();
 
             var deltaMetadata = new DeltaMetadata
             {
                 HashAlgorithm = signature.HashAlgorithm.Name,
-                ExpectedFileHashAlgorithm = newFileVerificationHashAlgorithm.Name,
+                ExpectedFileHashAlgorithm = newFileHashAlgorithmName,
                 ExpectedFileHash = Convert.ToBase64String(newFileHash),
                 BaseFileHash = signature.Metadata.BaseFileHash,
-                BaseFileHashAlgorithm = signature.Metadata.BaseFileHashAlgorithm
+                BaseFileHashAlgorithm = signature.Metadata.BaseFileHashAlgorithm,
+                BaseFileLength = signature.Metadata.BaseFileLength,
+                TargetFileLength = newFileStream.Length
             };
 
-            if (SkipDeltaIfHashesMatch && BaseFileHashMatches(signature.Metadata, newFileHash, newFileVerificationHashAlgorithm.Name))
+            if (SkipDeltaIfHashesMatch && BaseFileHashMatches(signature.Metadata, newFileHash, newFileHashAlgorithmName))
             {
                 WriteUnchangedFileDelta(signature, deltaMetadata, deltaWriter);
                 return;

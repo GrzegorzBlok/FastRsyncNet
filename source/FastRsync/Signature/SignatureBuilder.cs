@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using FastRsync.Core;
@@ -36,6 +38,17 @@ namespace FastRsync.Signature
 
         public IProgress<ProgressReport> ProgressReport { get; set; }
 
+        /// <summary>
+        /// When enabled (default), the base file is read only once: the verification hash is
+        /// computed incrementally while chunk signatures are collected in memory (roughly 1% of
+        /// the base file size) and everything is written at the end. This halves the I/O, which
+        /// matters most when the base file is a network-backed stream (e.g. Azure Blob).
+        /// The produced signature is byte-identical to the two-pass mode. Disable to stream
+        /// chunk signatures directly to the writer without buffering them, at the cost of
+        /// reading the base file twice.
+        /// </summary>
+        public bool SinglePassBuild { get; set; } = true;
+
         public IHashAlgorithm HashAlgorithm { get; set; }
 
         public IRollingChecksum RollingChecksumAlgorithm { get; set; }
@@ -56,6 +69,12 @@ namespace FastRsync.Signature
         public void Build(Stream baseDataStream, ISignatureWriter signatureWriter)
         {
             var bufferedStream = new BufferedStream(baseDataStream, StreamBufferSize);
+            if (SinglePassBuild)
+            {
+                BuildSinglePass(bufferedStream, signatureWriter);
+                return;
+            }
+
             WriteMetadata(bufferedStream, signatureWriter);
             WriteChunkSignatures(bufferedStream, signatureWriter);
         }
@@ -66,8 +85,137 @@ namespace FastRsync.Signature
         public async Task BuildAsync(Stream baseDataStream, ISignatureWriter signatureWriter, CancellationToken cancellationToken)
         {
             var bufferedStream = new BufferedStream(baseDataStream, StreamBufferSize);
+            if (SinglePassBuild)
+            {
+                await BuildSinglePassAsync(bufferedStream, signatureWriter, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
             await WriteMetadataAsync(bufferedStream, signatureWriter, cancellationToken).ConfigureAwait(false);
             await WriteChunkSignaturesAsync(bufferedStream, signatureWriter, cancellationToken).ConfigureAwait(false);
+        }
+
+        private void BuildSinglePass(Stream baseFileStream, ISignatureWriter signatureWriter)
+        {
+            var checksumAlgorithm = RollingChecksumAlgorithm;
+            var hashAlgorithm = HashAlgorithm;
+            var fileLength = baseFileStream.Length;
+
+            ProgressReport?.Report(new ProgressReport
+            {
+                Operation = ProgressOperationType.BuildingSignatures,
+                CurrentPosition = 0,
+                Total = fileLength
+            });
+            baseFileStream.Seek(0, SeekOrigin.Begin);
+
+            // The signature format requires the metadata (which contains the whole-file
+            // verification hash) to be written first, so the chunk signatures are collected
+            // in memory until the end of the single pass.
+            var chunkSignatures = new List<ChunkSignature>();
+            long start = 0;
+            int read;
+            var block = new byte[ChunkSize];
+
+            using (var baseFileVerificationHash = MD5.Create())
+            {
+                while ((read = ReadWholeBlock(baseFileStream, block)) > 0)
+                {
+                    baseFileVerificationHash.TransformBlock(block, 0, read, null, 0);
+
+                    chunkSignatures.Add(new ChunkSignature
+                    {
+                        StartOffset = start,
+                        Length = (short)read,
+                        Hash = hashAlgorithm.ComputeHash(block, 0, read),
+                        RollingChecksum = checksumAlgorithm.Calculate(block, 0, read)
+                    });
+
+                    start += read;
+                    ProgressReport?.Report(new ProgressReport
+                    {
+                        Operation = ProgressOperationType.BuildingSignatures,
+                        CurrentPosition = start,
+                        Total = fileLength
+                    });
+                }
+
+                baseFileVerificationHash.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+
+                signatureWriter.WriteMetadata(new SignatureMetadata
+                {
+                    ChunkHashAlgorithm = hashAlgorithm.Name,
+                    RollingChecksumAlgorithm = checksumAlgorithm.Name,
+                    BaseFileHashAlgorithm = "MD5",
+                    BaseFileHash = Convert.ToBase64String(baseFileVerificationHash.Hash),
+                    BaseFileLength = start
+                });
+            }
+
+            foreach (var chunk in chunkSignatures)
+            {
+                signatureWriter.WriteChunk(chunk);
+            }
+        }
+
+        private async Task BuildSinglePassAsync(Stream baseFileStream, ISignatureWriter signatureWriter, CancellationToken cancellationToken)
+        {
+            var checksumAlgorithm = RollingChecksumAlgorithm;
+            var hashAlgorithm = HashAlgorithm;
+            var fileLength = baseFileStream.Length;
+
+            ProgressReport?.Report(new ProgressReport
+            {
+                Operation = ProgressOperationType.BuildingSignatures,
+                CurrentPosition = 0,
+                Total = fileLength
+            });
+            baseFileStream.Seek(0, SeekOrigin.Begin);
+
+            var chunkSignatures = new List<ChunkSignature>();
+            long start = 0;
+            int read;
+            var block = new byte[ChunkSize];
+
+            using (var baseFileVerificationHash = MD5.Create())
+            {
+                while ((read = await ReadWholeBlockAsync(baseFileStream, block, cancellationToken).ConfigureAwait(false)) > 0)
+                {
+                    baseFileVerificationHash.TransformBlock(block, 0, read, null, 0);
+
+                    chunkSignatures.Add(new ChunkSignature
+                    {
+                        StartOffset = start,
+                        Length = (short)read,
+                        Hash = hashAlgorithm.ComputeHash(block, 0, read),
+                        RollingChecksum = checksumAlgorithm.Calculate(block, 0, read)
+                    });
+
+                    start += read;
+                    ProgressReport?.Report(new ProgressReport
+                    {
+                        Operation = ProgressOperationType.BuildingSignatures,
+                        CurrentPosition = start,
+                        Total = fileLength
+                    });
+                }
+
+                baseFileVerificationHash.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+
+                await signatureWriter.WriteMetadataAsync(new SignatureMetadata
+                {
+                    ChunkHashAlgorithm = hashAlgorithm.Name,
+                    RollingChecksumAlgorithm = checksumAlgorithm.Name,
+                    BaseFileHashAlgorithm = "MD5",
+                    BaseFileHash = Convert.ToBase64String(baseFileVerificationHash.Hash),
+                    BaseFileLength = start
+                }, cancellationToken).ConfigureAwait(false);
+            }
+
+            foreach (var chunk in chunkSignatures)
+            {
+                await signatureWriter.WriteChunkAsync(chunk, cancellationToken).ConfigureAwait(false);
+            }
         }
 
         private void WriteMetadata(Stream baseFileStream, ISignatureWriter signatureWriter)
@@ -82,13 +230,17 @@ namespace FastRsync.Signature
             baseFileStream.Seek(0, SeekOrigin.Begin);
             var baseFileVerificationHashAlgorithm = SupportedAlgorithms.Hashing.Md5();
             var baseFileHash = baseFileVerificationHashAlgorithm.ComputeHash(baseFileStream);
+            var baseFileHashAlgorithmName = baseFileVerificationHashAlgorithm.Name;
+            // MD5 instances hold disposable resources and are only needed for the hash above.
+            (baseFileVerificationHashAlgorithm as IDisposable)?.Dispose();
 
             signatureWriter.WriteMetadata(new SignatureMetadata
             {
                 ChunkHashAlgorithm = HashAlgorithm.Name,
                 RollingChecksumAlgorithm = RollingChecksumAlgorithm.Name,
-                BaseFileHashAlgorithm = baseFileVerificationHashAlgorithm.Name,
-                BaseFileHash = Convert.ToBase64String(baseFileHash)
+                BaseFileHashAlgorithm = baseFileHashAlgorithmName,
+                BaseFileHash = Convert.ToBase64String(baseFileHash),
+                BaseFileLength = baseFileStream.Length
             });
 
             ProgressReport?.Report(new ProgressReport
@@ -111,13 +263,17 @@ namespace FastRsync.Signature
             baseFileStream.Seek(0, SeekOrigin.Begin);
             var baseFileVerificationHashAlgorithm = SupportedAlgorithms.Hashing.Md5();
             var baseFileHash = await baseFileVerificationHashAlgorithm.ComputeHashAsync(baseFileStream, cancellationToken).ConfigureAwait(false);
+            var baseFileHashAlgorithmName = baseFileVerificationHashAlgorithm.Name;
+            // MD5 instances hold disposable resources and are only needed for the hash above.
+            (baseFileVerificationHashAlgorithm as IDisposable)?.Dispose();
 
             await signatureWriter.WriteMetadataAsync(new SignatureMetadata
             {
                 ChunkHashAlgorithm = HashAlgorithm.Name,
                 RollingChecksumAlgorithm = RollingChecksumAlgorithm.Name,
-                BaseFileHashAlgorithm = baseFileVerificationHashAlgorithm.Name,
-                BaseFileHash = Convert.ToBase64String(baseFileHash)
+                BaseFileHashAlgorithm = baseFileHashAlgorithmName,
+                BaseFileHash = Convert.ToBase64String(baseFileHash),
+                BaseFileLength = baseFileStream.Length
             }, cancellationToken).ConfigureAwait(false);
 
             ProgressReport?.Report(new ProgressReport

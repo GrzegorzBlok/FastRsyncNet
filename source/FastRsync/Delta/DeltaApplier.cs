@@ -22,6 +22,8 @@ namespace FastRsync.Delta
         {
             var buffer = new byte[readBufferSize];
 
+            var preallocatedLength = TryPreallocateOutput(outputStream, delta.Metadata);
+
             delta.Apply(
                 writeData: (data) => outputStream.Write(data, 0, data.Length),
                 copy: (startPosition, length) =>
@@ -36,6 +38,8 @@ namespace FastRsync.Delta
                         outputStream.Write(buffer, 0, read);
                     }
                 });
+
+            TrimPreallocatedOutput(outputStream, preallocatedLength);
 
             if (!SkipHashCheck)
             {
@@ -54,6 +58,8 @@ namespace FastRsync.Delta
         {
             var buffer = new byte[readBufferSize];
 
+            var preallocatedLength = TryPreallocateOutput(outputStream, delta.Metadata);
+
             await delta.ApplyAsync(
                 writeData: async (data) => await outputStream.WriteAsync(data, 0, data.Length, cancellationToken).ConfigureAwait(false),
                 copy: async (startPosition, length) =>
@@ -69,6 +75,8 @@ namespace FastRsync.Delta
                     }
                 }, cancellationToken).ConfigureAwait(false);
 
+            TrimPreallocatedOutput(outputStream, preallocatedLength);
+
             if (!SkipHashCheck)
             {
                 if (!await HashCheckAsync(delta, outputStream, cancellationToken).ConfigureAwait(false))
@@ -76,6 +84,40 @@ namespace FastRsync.Delta
                     throw new InvalidDataException(
                         $"Verification of the patched file failed. The {delta.Metadata.ExpectedFileHashAlgorithm} hash of the patch result file, and the file that was used as input for the delta, do not match. This can happen if the basis file changed since the signatures were calculated.");
                 }
+            }
+        }
+
+        // Preallocating the output improves large-file writes on seekable streams (fewer
+        // incremental file extensions, less fragmentation). The guard requires a fresh output
+        // (empty, at position zero, seekable and writable), so network, append-only or
+        // partially written streams keep their existing behavior. Deltas from older versions
+        // carry no target length and skip preallocation as well.
+        private static long TryPreallocateOutput(Stream outputStream, DeltaMetadata metadata)
+        {
+            var targetFileLength = metadata?.TargetFileLength ?? 0;
+            if (targetFileLength <= 0 || !outputStream.CanSeek || !outputStream.CanWrite
+                || outputStream.Position != 0 || outputStream.Length != 0)
+                return 0;
+
+            try
+            {
+                outputStream.SetLength(targetFileLength);
+                return targetFileLength;
+            }
+            catch (NotSupportedException)
+            {
+                // Seekable but fixed-size streams, e.g. a MemoryStream over a caller-supplied array.
+                return 0;
+            }
+        }
+
+        // If the delta produced fewer bytes than the declared target length, trim the
+        // preallocated tail so the output matches what a non-preallocated apply produces.
+        private static void TrimPreallocatedOutput(Stream outputStream, long preallocatedLength)
+        {
+            if (preallocatedLength > 0 && outputStream.Position < preallocatedLength)
+            {
+                outputStream.SetLength(outputStream.Position);
             }
         }
 
@@ -87,6 +129,7 @@ namespace FastRsync.Delta
             var algorithm = SupportedAlgorithms.Hashing.Create(delta.Metadata.ExpectedFileHashAlgorithm);
 
             var actualHash = algorithm.ComputeHash(outputStream);
+            (algorithm as IDisposable)?.Dispose();
 
             return ByteArrayEquality.AreEqual(sourceFileHash, actualHash);
         }
@@ -101,6 +144,7 @@ namespace FastRsync.Delta
             var algorithm = SupportedAlgorithms.Hashing.Create(delta.Metadata.ExpectedFileHashAlgorithm);
 
             var actualHash = await algorithm.ComputeHashAsync(outputStream, cancellationToken).ConfigureAwait(false);
+            (algorithm as IDisposable)?.Dispose();
 
             return ByteArrayEquality.AreEqual(sourceFileHash, actualHash);
         }

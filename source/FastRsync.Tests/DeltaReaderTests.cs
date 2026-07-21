@@ -49,6 +49,9 @@ public class DeltaReaderTests
         Assert.That(target.Metadata.HashAlgorithm, Is.EqualTo(hashAlgorithm.Name));
         Assert.That(target.Metadata.BaseFileHash, Is.Null);
         Assert.That(target.Metadata.BaseFileHashAlgorithm, Is.Null);
+        // Metadata written by older versions carries no file lengths
+        Assert.That(target.Metadata.BaseFileLength, Is.Null);
+        Assert.That(target.Metadata.TargetFileLength, Is.Null);
     }
 
     [Test]
