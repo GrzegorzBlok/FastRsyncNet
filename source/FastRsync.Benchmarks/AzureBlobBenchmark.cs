@@ -14,6 +14,7 @@ namespace FastRsync.Benchmarks
     // networked usage of the library. Targets local Azurite by default; set the
     // FASTRSYNC_BENCH_STORAGE environment variable to a connection string to run against a
     // real storage account.
+    [MemoryDiagnoser]
     public class AzureBlobBenchmark
     {
         private const string ContainerName = "fastrsync-benchmark";
@@ -111,6 +112,32 @@ namespace FastRsync.Benchmarks
             {
                 var output = new MemoryStream();
                 new DeltaApplier().Apply(basisStream, new BinaryDeltaReader(deltaStream, null), output);
+                return output.Length;
+            }
+        }
+
+        [Benchmark]
+        public long ApplyDeltaFromBlobPooled()
+        {
+            using (var basisStream = OpenRead(baseBlob))
+            using (var deltaStream = OpenRead(deltaBlob))
+            {
+                var output = new MemoryStream();
+                new DeltaApplier { UseBufferPool = true }
+                    .Apply(basisStream, new BinaryDeltaReader(deltaStream, null) { UseBufferPool = true }, output);
+                return output.Length;
+            }
+        }
+
+        [Benchmark]
+        public long ApplyDeltaFromBlobNotPooled()
+        {
+            using (var basisStream = OpenRead(baseBlob))
+            using (var deltaStream = OpenRead(deltaBlob))
+            {
+                var output = new MemoryStream();
+                new DeltaApplier { UseBufferPool = false }
+                    .Apply(basisStream, new BinaryDeltaReader(deltaStream, null) { UseBufferPool = false }, output);
                 return output.Length;
             }
         }

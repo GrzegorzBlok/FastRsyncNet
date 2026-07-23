@@ -32,6 +32,13 @@ namespace FastRsync.Delta
             this.readBufferSize = readBufferSize;
         }
 
+        /// <summary>
+        /// When enabled (default), the async apply buffer is rented from the shared array pool
+        /// instead of allocated per call. Reduces GC pressure across many operations. Does not
+        /// affect output.
+        /// </summary>
+        public bool UseBufferPool { get; set; } = true;
+
         private DeltaMetadata _metadata;
         private RsyncFormatType type;
 
@@ -222,58 +229,67 @@ namespace FastRsync.Delta
 
             ReadMetadata();
 
-            var buffer = new byte[readBufferSize];
-
-            // See the comment in Apply: buffering is scoped to the command section.
-            var commandReader = new BinaryReader(new BufferedStream(reader.BaseStream, StreamBufferSize));
-
-            while (commandReader.BaseStream.Position != fileLength)
+            var rented = PooledBuffer.Rent(readBufferSize, UseBufferPool);
+            var buffer = rented.Array;
+            try
             {
-                var b = commandReader.ReadByte();
+                // See the comment in Apply: buffering is scoped to the command section.
+                var commandReader = new BinaryReader(new BufferedStream(reader.BaseStream, StreamBufferSize));
 
-                progressReport?.Report(new ProgressReport
+                while (commandReader.BaseStream.Position != fileLength)
                 {
-                    Operation = ProgressOperationType.ApplyingDelta,
-                    CurrentPosition = commandReader.BaseStream.Position,
-                    Total = fileLength
-                });
+                    var b = commandReader.ReadByte();
 
-                if (b == BinaryFormat.CopyCommand)
-                {
-                    var start = commandReader.ReadInt64();
-                    var length = commandReader.ReadInt64();
-                    if (start < 0 || length < 0)
-                        throw new InvalidDataException("The delta file appears to be corrupt; a copy command has a negative offset or length.");
-                    await copy(start, length).ConfigureAwait(false);
-                }
-                else if (b == BinaryFormat.DataCommand)
-                {
-                    var length = commandReader.ReadInt64();
-                    if (length < 0)
-                        throw new InvalidDataException("The delta file appears to be corrupt; a data command has a negative length.");
-                    long soFar = 0;
-                    while (soFar < length)
+                    progressReport?.Report(new ProgressReport
                     {
-                        var bytesRead = await commandReader.BaseStream
-                            .ReadAsync(buffer, 0, (int)Math.Min(length - soFar, buffer.Length), cancellationToken)
-                            .ConfigureAwait(false);
-                        if (bytesRead == 0)
-                            throw new InvalidDataException("The delta file appears to be corrupt; a data command is truncated.");
-                        var bytes = buffer;
-                        if (bytesRead != buffer.Length)
-                        {
-                            bytes = new byte[bytesRead];
-                            Array.Copy(buffer, bytes, bytesRead);
-                        }
+                        Operation = ProgressOperationType.ApplyingDelta,
+                        CurrentPosition = commandReader.BaseStream.Position,
+                        Total = fileLength
+                    });
 
-                        soFar += bytes.Length;
-                        await writeData(bytes).ConfigureAwait(false);
+                    if (b == BinaryFormat.CopyCommand)
+                    {
+                        var start = commandReader.ReadInt64();
+                        var length = commandReader.ReadInt64();
+                        if (start < 0 || length < 0)
+                            throw new InvalidDataException("The delta file appears to be corrupt; a copy command has a negative offset or length.");
+                        await copy(start, length).ConfigureAwait(false);
+                    }
+                    else if (b == BinaryFormat.DataCommand)
+                    {
+                        var length = commandReader.ReadInt64();
+                        if (length < 0)
+                            throw new InvalidDataException("The delta file appears to be corrupt; a data command has a negative length.");
+                        long soFar = 0;
+                        while (soFar < length)
+                        {
+                            var bytesRead = await commandReader.BaseStream
+                                .ReadAsync(buffer, 0, (int)Math.Min(length - soFar, readBufferSize), cancellationToken)
+                                .ConfigureAwait(false);
+                            if (bytesRead == 0)
+                                throw new InvalidDataException("The delta file appears to be corrupt; a data command is truncated.");
+                            var bytes = buffer;
+                            // A pooled buffer is larger than readBufferSize, so this is always true when
+                            // pooling and a correctly-sized copy is handed to writeData.
+                            if (bytesRead != buffer.Length)
+                            {
+                                bytes = new byte[bytesRead];
+                                Array.Copy(buffer, bytes, bytesRead);
+                            }
+
+                            soFar += bytes.Length;
+                            await writeData(bytes).ConfigureAwait(false);
+                        }
+                    }
+                    else
+                    {
+                        throw new InvalidDataException($"The delta file appears to be corrupt; encountered an unknown command 0x{b:X2}.");
                     }
                 }
-                else
-                {
-                    throw new InvalidDataException($"The delta file appears to be corrupt; encountered an unknown command 0x{b:X2}.");
-                }
+            }
+            finally
+            {
+                rented.Dispose();
             }
         }
     }

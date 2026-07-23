@@ -102,7 +102,7 @@ using (var deltaStream = new FileStream(deltaFilePath, FileMode.Create, FileAcce
 }
 ```
 
-### Calculating signature on Azure blobs
+### Calculating signature on network stream (Azure blobs)
 
 The examples below use the modern `Azure.Storage.Blobs` SDK. The input stream must be seekable; `OpenReadAsync` returns a seekable stream, so blobs work directly.
 
@@ -129,6 +129,7 @@ using (var signatureStream = await signatureBlob.OpenWriteAsync(overwrite: true)
 * **`SignatureBuilder.SinglePassBuild`** (default `true`) - the basis file is read only once; the verification hash is computed incrementally while the chunk signatures are gathered. This roughly halves the I/O and is about twice as fast when the basis file is a network-backed stream. The produced signature is byte-for-byte identical to the two-pass output. It buffers the chunk signatures in memory (about 1% of the basis file size); set it to `false` to stream them directly at the cost of reading the basis file twice.
 * **`DeltaBuilder.SkipDeltaIfHashesMatch`** (default `false`, opt-in) - when the new file's hash matches the basis file hash recorded in the signature, delta building skips scanning the file entirely and emits a minimal delta. Building deltas for unchanged files becomes almost free. Because it relies on hash equality, do not enable it if an adversary might supply colliding inputs.
 * **Metadata file lengths** - signatures record the basis file length; deltas record the basis and target file lengths. `DeltaApplier` uses the target length to preallocate the output when writing to a fresh seekable stream. These fields are ignored by older versions.
+* **`UseBufferPool`** on `DeltaBuilder`, `DeltaApplier` and `BinaryDeltaReader` (default `true`) - rents the multi-megabyte working buffer from the shared array pool instead of allocating it per operation. This removes a large-object-heap allocation per operation, which reduces GC pressure noticeably when many operations run in the same process (e.g. a server). It does not change the output. Set it to `false` for one-shot or memory-sensitive local use, where the pool retaining buffers between operations is not worthwhile.
 
 ## Available algorithms and relative performance
 

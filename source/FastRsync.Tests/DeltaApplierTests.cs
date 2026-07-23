@@ -67,6 +67,24 @@ public class DeltaApplierTests
         Assert.That(outputStream.SetLengthCalls, Is.Empty);
     }
 
+    [Test]
+    [TestCase(true)]
+    [TestCase(false)]
+    public void Apply_WithAndWithoutBufferPool_ProducesCorrectOutput(bool useBufferPool)
+    {
+        // Arrange
+        var (baseDataStream, baseSignatureStream, newData, newDataStream) = Utils.PrepareTestData(16974, 8452, SignatureBuilder.DefaultChunkSize);
+        var deltaStream = BuildDelta(baseSignatureStream, newDataStream);
+
+        // Act
+        var outputStream = new MemoryStream();
+        var deltaApplier = new DeltaApplier { UseBufferPool = useBufferPool };
+        deltaApplier.Apply(baseDataStream, new BinaryDeltaReader(deltaStream, null), outputStream);
+
+        // Assert - pooling must not affect the reconstructed file
+        CollectionAssert.AreEqual(newData, outputStream.ToArray());
+    }
+
     private static MemoryStream BuildDelta(MemoryStream baseSignatureStream, MemoryStream newDataStream)
     {
         var deltaStream = new MemoryStream();

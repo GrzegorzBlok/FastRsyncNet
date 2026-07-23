@@ -13,6 +13,8 @@ using FastRsync.Hash;
 namespace FastRsync.Tests;
 
 [TestFixture]
+// Multi-gigabyte files (~8GB temp disk, minutes per case); excluded from fast/coverage runs.
+[Category("Integration")]
 public class PatchingBigFilesTests
 {
     [Test]

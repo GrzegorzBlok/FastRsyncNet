@@ -131,6 +131,27 @@ public class DeltaBuilderTests
     }
 
     [Test]
+    [TestCase(16974, 8452)]
+    [TestCase(6666, 6666)]
+    public void BuildDelta_WithAndWithoutBufferPool_ProduceIdenticalDelta(int baseNumberOfBytes, int newDataNumberOfBytes)
+    {
+        // Arrange - identical inputs, one with pooling on (default), one off.
+        var (_, sigA, newData, newStreamA) = Utils.PrepareTestData(baseNumberOfBytes, newDataNumberOfBytes, SignatureBuilder.DefaultChunkSize);
+        var newStreamB = new MemoryStream(newData);
+        var sigB = new MemoryStream(sigA.ToArray());
+
+        // Act
+        var pooled = new MemoryStream();
+        new DeltaBuilder { UseBufferPool = true }.BuildDelta(newStreamA, new SignatureReader(sigA, null), new AggregateCopyOperationsDecorator(new BinaryDeltaWriter(pooled)));
+
+        var notPooled = new MemoryStream();
+        new DeltaBuilder { UseBufferPool = false }.BuildDelta(newStreamB, new SignatureReader(sigB, null), new AggregateCopyOperationsDecorator(new BinaryDeltaWriter(notPooled)));
+
+        // Assert - pooling is an allocation strategy only; the delta bytes must be identical.
+        CollectionAssert.AreEqual(notPooled.ToArray(), pooled.ToArray());
+    }
+
+    [Test]
     public void BuildDelta_WritesBaseAndTargetFileLengthMetadata()
     {
         // Arrange

@@ -18,28 +18,43 @@ namespace FastRsync.Delta
 
         public bool SkipHashCheck { get; set; }
 
+        /// <summary>
+        /// When enabled (default), the multi-megabyte working buffer is rented from the shared
+        /// array pool instead of allocated per call. This reduces GC pressure when many apply
+        /// operations run in the same process. Disable for one-shot/local use where retaining
+        /// pooled buffers is undesirable. Does not affect output.
+        /// </summary>
+        public bool UseBufferPool { get; set; } = true;
+
         public void Apply(Stream basisFileStream, IDeltaReader delta, Stream outputStream)
         {
-            var buffer = new byte[readBufferSize];
+            var rented = PooledBuffer.Rent(readBufferSize, UseBufferPool);
+            var buffer = rented.Array;
+            try
+            {
+                var preallocatedLength = TryPreallocateOutput(outputStream, delta.Metadata);
 
-            var preallocatedLength = TryPreallocateOutput(outputStream, delta.Metadata);
-
-            delta.Apply(
-                writeData: (data) => outputStream.Write(data, 0, data.Length),
-                copy: (startPosition, length) =>
-                {
-                    basisFileStream.Seek(startPosition, SeekOrigin.Begin);
-
-                    int read;
-                    long soFar = 0;
-                    while ((read = basisFileStream.Read(buffer, 0, (int)Math.Min(length - soFar, buffer.Length))) > 0)
+                delta.Apply(
+                    writeData: (data) => outputStream.Write(data, 0, data.Length),
+                    copy: (startPosition, length) =>
                     {
-                        soFar += read;
-                        outputStream.Write(buffer, 0, read);
-                    }
-                });
+                        basisFileStream.Seek(startPosition, SeekOrigin.Begin);
 
-            TrimPreallocatedOutput(outputStream, preallocatedLength);
+                        int read;
+                        long soFar = 0;
+                        while ((read = basisFileStream.Read(buffer, 0, (int)Math.Min(length - soFar, readBufferSize))) > 0)
+                        {
+                            soFar += read;
+                            outputStream.Write(buffer, 0, read);
+                        }
+                    });
+
+                TrimPreallocatedOutput(outputStream, preallocatedLength);
+            }
+            finally
+            {
+                rented.Dispose();
+            }
 
             if (!SkipHashCheck)
             {
@@ -56,26 +71,33 @@ namespace FastRsync.Delta
 
         public async Task ApplyAsync(Stream basisFileStream, IDeltaReader delta, Stream outputStream, CancellationToken cancellationToken)
         {
-            var buffer = new byte[readBufferSize];
+            var rented = PooledBuffer.Rent(readBufferSize, UseBufferPool);
+            var buffer = rented.Array;
+            try
+            {
+                var preallocatedLength = TryPreallocateOutput(outputStream, delta.Metadata);
 
-            var preallocatedLength = TryPreallocateOutput(outputStream, delta.Metadata);
-
-            await delta.ApplyAsync(
-                writeData: async (data) => await outputStream.WriteAsync(data, 0, data.Length, cancellationToken).ConfigureAwait(false),
-                copy: async (startPosition, length) =>
-                {
-                    basisFileStream.Seek(startPosition, SeekOrigin.Begin);
-
-                    int read;
-                    long soFar = 0;
-                    while ((read = await basisFileStream.ReadAsync(buffer, 0, (int)Math.Min(length - soFar, buffer.Length), cancellationToken).ConfigureAwait(false)) > 0)
+                await delta.ApplyAsync(
+                    writeData: async (data) => await outputStream.WriteAsync(data, 0, data.Length, cancellationToken).ConfigureAwait(false),
+                    copy: async (startPosition, length) =>
                     {
-                        soFar += read;
-                        await outputStream.WriteAsync(buffer, 0, read, cancellationToken).ConfigureAwait(false);
-                    }
-                }, cancellationToken).ConfigureAwait(false);
+                        basisFileStream.Seek(startPosition, SeekOrigin.Begin);
 
-            TrimPreallocatedOutput(outputStream, preallocatedLength);
+                        int read;
+                        long soFar = 0;
+                        while ((read = await basisFileStream.ReadAsync(buffer, 0, (int)Math.Min(length - soFar, readBufferSize), cancellationToken).ConfigureAwait(false)) > 0)
+                        {
+                            soFar += read;
+                            await outputStream.WriteAsync(buffer, 0, read, cancellationToken).ConfigureAwait(false);
+                        }
+                    }, cancellationToken).ConfigureAwait(false);
+
+                TrimPreallocatedOutput(outputStream, preallocatedLength);
+            }
+            finally
+            {
+                rented.Dispose();
+            }
 
             if (!SkipHashCheck)
             {

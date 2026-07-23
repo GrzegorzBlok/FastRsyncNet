@@ -38,6 +38,13 @@ namespace FastRsync.Delta
         /// </summary>
         public bool SkipDeltaIfHashesMatch { get; set; }
 
+        /// <summary>
+        /// When enabled (default), the multi-megabyte scan buffer is rented from the shared array
+        /// pool instead of allocated per call. This reduces GC pressure when many delta operations
+        /// run in the same process. Disable for one-shot/local use. Does not affect output.
+        /// </summary>
+        public bool UseBufferPool { get; set; } = true;
+
         public void BuildDelta(Stream newFileStream, ISignatureReader signatureReader, IDeltaWriter deltaWriter)
         {
             var newFileVerificationHashAlgorithm = SupportedAlgorithms.Hashing.Md5();
@@ -74,90 +81,99 @@ namespace FastRsync.Delta
 
             var checksumAlgorithm = signature.RollingChecksumAlgorithm;
 
-            var buffer = new byte[readBufferSize];
+            var rented = PooledBuffer.Rent(readBufferSize, UseBufferPool);
+            var buffer = rented.Array;
             long lastMatchPosition = 0;
-
-            var fileSize = newFileStream.Length;
-            ProgressReport?.Report(new ProgressReport
+            try
             {
-                Operation = ProgressOperationType.BuildingDelta,
-                CurrentPosition = 0,
-                Total = fileSize
-            });
-
-            while (true)
-            {
-                var startPosition = newFileStream.Position;
-                var read = newFileStream.Read(buffer, 0, buffer.Length);
-                if (read <= 0)
-                    break;
-
+                var fileSize = newFileStream.Length;
                 ProgressReport?.Report(new ProgressReport
                 {
                     Operation = ProgressOperationType.BuildingDelta,
-                    CurrentPosition = startPosition,
+                    CurrentPosition = 0,
                     Total = fileSize
                 });
-                
-                uint checksum = 0;
 
-                var remainingPossibleChunkSize = maxChunkSize;
-
-                for (var i = 0; i < read - minChunkSize + 1; i++)
+                while (true)
                 {
-                    var readSoFar = startPosition + i;
+                    var startPosition = newFileStream.Position;
+                    // Read only readBufferSize bytes: a pooled buffer may be larger, and the scan
+                    // window logic below depends on this fixed size.
+                    var read = newFileStream.Read(buffer, 0, readBufferSize);
+                    if (read <= 0)
+                        break;
 
-                    var remainingBytes = read - i;
-                    if (remainingBytes < maxChunkSize)
+                    ProgressReport?.Report(new ProgressReport
                     {
-                        remainingPossibleChunkSize = minChunkSize;
-                    }
+                        Operation = ProgressOperationType.BuildingDelta,
+                        CurrentPosition = startPosition,
+                        Total = fileSize
+                    });
 
-                    if (i == 0 || remainingBytes < maxChunkSize)
+                    uint checksum = 0;
+
+                    var remainingPossibleChunkSize = maxChunkSize;
+
+                    for (var i = 0; i < read - minChunkSize + 1; i++)
                     {
-                        checksum = checksumAlgorithm.Calculate(buffer, i, remainingPossibleChunkSize);
-                    }
-                    else
-                    {
-                        var remove = buffer[i - 1];
-                        var add = buffer[i + remainingPossibleChunkSize - 1];
-                        checksum = checksumAlgorithm.Rotate(checksum, remove, add, remainingPossibleChunkSize);
-                    }
+                        var readSoFar = startPosition + i;
 
-                    if (readSoFar - (lastMatchPosition - remainingPossibleChunkSize) < remainingPossibleChunkSize)
-                        continue;
-
-                    if (!chunkMap.TryGetValue(checksum, out var startIndex)) 
-                        continue;
-
-                    for (var j = startIndex; j < chunks.Count && chunks[j].RollingChecksum == checksum; j++)
-                    {
-                        var chunk = chunks[j];
-                        var hash = signature.HashAlgorithm.ComputeHash(buffer, i, remainingPossibleChunkSize);
-
-                        if (ByteArrayEquality.AreEqual(hash, chunks[j].Hash))
+                        var remainingBytes = read - i;
+                        if (remainingBytes < maxChunkSize)
                         {
-                            readSoFar += remainingPossibleChunkSize;
+                            remainingPossibleChunkSize = minChunkSize;
+                        }
 
-                            var missing = readSoFar - lastMatchPosition;
-                            if (missing > remainingPossibleChunkSize)
+                        if (i == 0 || remainingBytes < maxChunkSize)
+                        {
+                            checksum = checksumAlgorithm.Calculate(buffer, i, remainingPossibleChunkSize);
+                        }
+                        else
+                        {
+                            var remove = buffer[i - 1];
+                            var add = buffer[i + remainingPossibleChunkSize - 1];
+                            checksum = checksumAlgorithm.Rotate(checksum, remove, add, remainingPossibleChunkSize);
+                        }
+
+                        if (readSoFar - (lastMatchPosition - remainingPossibleChunkSize) < remainingPossibleChunkSize)
+                            continue;
+
+                        if (!chunkMap.TryGetValue(checksum, out var startIndex))
+                            continue;
+
+                        for (var j = startIndex; j < chunks.Count && chunks[j].RollingChecksum == checksum; j++)
+                        {
+                            var chunk = chunks[j];
+                            var hash = signature.HashAlgorithm.ComputeHash(buffer, i, remainingPossibleChunkSize);
+
+                            if (ByteArrayEquality.AreEqual(hash, chunks[j].Hash))
                             {
-                                deltaWriter.WriteDataCommand(newFileStream, lastMatchPosition, missing - remainingPossibleChunkSize);
-                            }
+                                readSoFar += remainingPossibleChunkSize;
 
-                            deltaWriter.WriteCopyCommand(new DataRange(chunk.StartOffset, chunk.Length));
-                            lastMatchPosition = readSoFar;
-                            break;
+                                var missing = readSoFar - lastMatchPosition;
+                                if (missing > remainingPossibleChunkSize)
+                                {
+                                    deltaWriter.WriteDataCommand(newFileStream, lastMatchPosition, missing - remainingPossibleChunkSize);
+                                }
+
+                                deltaWriter.WriteCopyCommand(new DataRange(chunk.StartOffset, chunk.Length));
+                                lastMatchPosition = readSoFar;
+                                break;
+                            }
                         }
                     }
-                }
 
-                if (read < buffer.Length)
-                {
-                    break;
-                }
+                    if (read < readBufferSize)
+                    {
+                        break;
+                    }
 
-                newFileStream.Position = newFileStream.Position - maxChunkSize + 1;
+                    newFileStream.Position = newFileStream.Position - maxChunkSize + 1;
+                }
+            }
+            finally
+            {
+                rented.Dispose();
             }
 
             if (newFileStream.Length != lastMatchPosition)
@@ -207,90 +223,99 @@ namespace FastRsync.Delta
 
             var checksumAlgorithm = signature.RollingChecksumAlgorithm;
 
-            var buffer = new byte[readBufferSize];
+            var rented = PooledBuffer.Rent(readBufferSize, UseBufferPool);
+            var buffer = rented.Array;
             long lastMatchPosition = 0;
-
-            var fileSize = newFileStream.Length;
-            ProgressReport?.Report(new ProgressReport
+            try
             {
-                Operation = ProgressOperationType.BuildingDelta,
-                CurrentPosition = 0,
-                Total = fileSize
-            });
-
-            while (true)
-            {
-                var startPosition = newFileStream.Position;
-                var read = await newFileStream.ReadAsync(buffer, 0, buffer.Length, cancellationToken).ConfigureAwait(false);
-                if (read <= 0)
-                    break;
-
+                var fileSize = newFileStream.Length;
                 ProgressReport?.Report(new ProgressReport
                 {
                     Operation = ProgressOperationType.BuildingDelta,
-                    CurrentPosition = startPosition,
+                    CurrentPosition = 0,
                     Total = fileSize
                 });
 
-                uint checksum = 0;
-
-                var remainingPossibleChunkSize = maxChunkSize;
-
-                for (var i = 0; i < read - minChunkSize + 1; i++)
+                while (true)
                 {
-                    var readSoFar = startPosition + i;
+                    var startPosition = newFileStream.Position;
+                    // Read only readBufferSize bytes: a pooled buffer may be larger, and the scan
+                    // window logic below depends on this fixed size.
+                    var read = await newFileStream.ReadAsync(buffer, 0, readBufferSize, cancellationToken).ConfigureAwait(false);
+                    if (read <= 0)
+                        break;
 
-                    var remainingBytes = read - i;
-                    if (remainingBytes < maxChunkSize)
+                    ProgressReport?.Report(new ProgressReport
                     {
-                        remainingPossibleChunkSize = minChunkSize;
-                    }
+                        Operation = ProgressOperationType.BuildingDelta,
+                        CurrentPosition = startPosition,
+                        Total = fileSize
+                    });
 
-                    if (i == 0 || remainingBytes < maxChunkSize)
+                    uint checksum = 0;
+
+                    var remainingPossibleChunkSize = maxChunkSize;
+
+                    for (var i = 0; i < read - minChunkSize + 1; i++)
                     {
-                        checksum = checksumAlgorithm.Calculate(buffer, i, remainingPossibleChunkSize);
-                    }
-                    else
-                    {
-                        var remove = buffer[i - 1];
-                        var add = buffer[i + remainingPossibleChunkSize - 1];
-                        checksum = checksumAlgorithm.Rotate(checksum, remove, add, remainingPossibleChunkSize);
-                    }
+                        var readSoFar = startPosition + i;
 
-                    if (readSoFar - (lastMatchPosition - remainingPossibleChunkSize) < remainingPossibleChunkSize)
-                        continue;
-
-                    if (!chunkMap.TryGetValue(checksum, out var startIndex))
-                        continue;
-
-                    for (var j = startIndex; j < chunks.Count && chunks[j].RollingChecksum == checksum; j++)
-                    {
-                        var chunk = chunks[j];
-                        var hash = signature.HashAlgorithm.ComputeHash(buffer, i, remainingPossibleChunkSize);
-
-                        if (ByteArrayEquality.AreEqual(hash, chunks[j].Hash))
+                        var remainingBytes = read - i;
+                        if (remainingBytes < maxChunkSize)
                         {
-                            readSoFar += remainingPossibleChunkSize;
+                            remainingPossibleChunkSize = minChunkSize;
+                        }
 
-                            var missing = readSoFar - lastMatchPosition;
-                            if (missing > remainingPossibleChunkSize)
+                        if (i == 0 || remainingBytes < maxChunkSize)
+                        {
+                            checksum = checksumAlgorithm.Calculate(buffer, i, remainingPossibleChunkSize);
+                        }
+                        else
+                        {
+                            var remove = buffer[i - 1];
+                            var add = buffer[i + remainingPossibleChunkSize - 1];
+                            checksum = checksumAlgorithm.Rotate(checksum, remove, add, remainingPossibleChunkSize);
+                        }
+
+                        if (readSoFar - (lastMatchPosition - remainingPossibleChunkSize) < remainingPossibleChunkSize)
+                            continue;
+
+                        if (!chunkMap.TryGetValue(checksum, out var startIndex))
+                            continue;
+
+                        for (var j = startIndex; j < chunks.Count && chunks[j].RollingChecksum == checksum; j++)
+                        {
+                            var chunk = chunks[j];
+                            var hash = signature.HashAlgorithm.ComputeHash(buffer, i, remainingPossibleChunkSize);
+
+                            if (ByteArrayEquality.AreEqual(hash, chunks[j].Hash))
                             {
-                                await deltaWriter.WriteDataCommandAsync(newFileStream, lastMatchPosition, missing - remainingPossibleChunkSize, cancellationToken).ConfigureAwait(false);
-                            }
+                                readSoFar += remainingPossibleChunkSize;
 
-                            deltaWriter.WriteCopyCommand(new DataRange(chunk.StartOffset, chunk.Length));
-                            lastMatchPosition = readSoFar;
-                            break;
+                                var missing = readSoFar - lastMatchPosition;
+                                if (missing > remainingPossibleChunkSize)
+                                {
+                                    await deltaWriter.WriteDataCommandAsync(newFileStream, lastMatchPosition, missing - remainingPossibleChunkSize, cancellationToken).ConfigureAwait(false);
+                                }
+
+                                deltaWriter.WriteCopyCommand(new DataRange(chunk.StartOffset, chunk.Length));
+                                lastMatchPosition = readSoFar;
+                                break;
+                            }
                         }
                     }
-                }
 
-                if (read < buffer.Length)
-                {
-                    break;
-                }
+                    if (read < readBufferSize)
+                    {
+                        break;
+                    }
 
-                newFileStream.Position = newFileStream.Position - maxChunkSize + 1;
+                    newFileStream.Position = newFileStream.Position - maxChunkSize + 1;
+                }
+            }
+            finally
+            {
+                rented.Dispose();
             }
 
             if (newFileStream.Length != lastMatchPosition)

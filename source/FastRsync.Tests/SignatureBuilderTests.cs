@@ -111,6 +111,29 @@ public class SignatureBuilderTests
     }
 
     [Test]
+    [TestCase(0)]
+    [TestCase(1037)]
+    [TestCase(16974)]
+    public async Task SignatureBuilderAsync_SinglePassAndTwoPass_ProduceIdenticalSignature(int dataLength)
+    {
+        // Arrange - exercises the two-pass async path (BuildAsync with SinglePassBuild = false),
+        // which the default single-pass builds never reach.
+        var data = new byte[dataLength];
+        new Random(RandomSeed).NextBytes(data);
+
+        // Act
+        var singlePassStream = new MemoryStream();
+        await new SignatureBuilder { SinglePassBuild = true }.BuildAsync(new MemoryStream(data), new SignatureWriter(singlePassStream)).ConfigureAwait(false);
+
+        var twoPassStream = new MemoryStream();
+        await new SignatureBuilder { SinglePassBuild = false }.BuildAsync(new MemoryStream(data), new SignatureWriter(twoPassStream)).ConfigureAwait(false);
+
+        // Assert - the async two-pass output must match single-pass and be a valid signature.
+        CollectionAssert.AreEqual(singlePassStream.ToArray(), twoPassStream.ToArray());
+        CommonAsserts.ValidateSignature(twoPassStream, SupportedAlgorithms.Hashing.XxHash(), Utils.GetMd5(data), new Adler32RollingChecksum());
+    }
+
+    [Test]
     [TestCase(true)]
     [TestCase(false)]
     public void SignatureBuilder_WritesBaseFileLengthMetadata(bool singlePassBuild)
