@@ -49,7 +49,8 @@ namespace Octodiff.Tests
             Run("delta " + name + ".sig " + newName + " " + name + ".delta", octodiff);
             Run("patch " + newBasis + " " + name + ".delta" + " " + copyName, octodiff);
             Assert.That(ExitCode, Is.EqualTo(2));
-            Assert.That(Output, Does.Contain("Error: Verification of the patched file failed"));
+            Assert.That(Output, Does.Contain("Error: Verification of the patched file failed")
+                .Or.Contain("does not match the one the delta was built against"));
         }
 
         [Test]

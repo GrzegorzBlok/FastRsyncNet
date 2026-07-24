@@ -236,4 +236,69 @@ public class GZipTests
         Assert.That(newFileStream.ToArray(), Is.EqualTo(decompressedStream.ToArray()));
         return deltaStream;
     }
+
+    [Test]
+    public void RsyncFriendlyGzip_ProducesMuchSmallerDeltaThanPlainGzip_ForSmallChange()
+    {
+        // Arrange
+        var baseData = CreateCompressibleData(4 * 1024 * 1024, seed: 7);
+        var changedData = (byte[])baseData.Clone();
+
+        // A small localized edit early in the stream (byte[] overload for net472 compatibility).
+        var patch = new byte[1024];
+        new Random(99).NextBytes(patch);
+        Array.Copy(patch, 0, changedData, 256 * 1024, patch.Length);
+
+        // Act
+        var plainDeltaLength = BuildDeltaLengthBetween(PlainGzip(baseData), PlainGzip(changedData));
+        var rsyncDeltaLength = BuildDeltaLengthBetween(RsyncGzip(baseData), RsyncGzip(changedData));
+
+        // Assert - rsync-friendly compression yields a far smaller delta for the same change.
+        Assert.That(rsyncDeltaLength * 2, Is.LessThan(plainDeltaLength),
+            $"rsync-friendly gzip delta ({rsyncDeltaLength}) should be far smaller than plain gzip delta ({plainDeltaLength})");
+    }
+
+    private static byte[] CreateCompressibleData(int length, int seed)
+    {
+        // 4-bit alphabet: compresses roughly 2x, so the compressed streams are substantial.
+        var rnd = new Random(seed);
+        var data = new byte[length];
+        for (var i = 0; i < length; i++)
+            data[i] = (byte)rnd.Next(0, 16);
+        return data;
+    }
+
+    private static byte[] PlainGzip(byte[] data)
+    {
+        var ms = new MemoryStream();
+        using (var gz = new GZipStream(ms, CompressionMode.Compress, true))
+            gz.Write(data, 0, data.Length);
+        return ms.ToArray();
+    }
+
+    private static byte[] RsyncGzip(byte[] data)
+    {
+        var ms = new MemoryStream();
+        GZip.Compress(new MemoryStream(data), ms);
+        return ms.ToArray();
+    }
+
+    private static long BuildDeltaLengthBetween(byte[] basisBytes, byte[] newBytes)
+    {
+        var signatureStream = new MemoryStream();
+        new SignatureBuilder().Build(new MemoryStream(basisBytes), new SignatureWriter(signatureStream));
+        signatureStream.Seek(0, SeekOrigin.Begin);
+
+        var deltaStream = new MemoryStream();
+        new DeltaBuilder().BuildDelta(new MemoryStream(newBytes), new SignatureReader(signatureStream, null),
+            new AggregateCopyOperationsDecorator(new BinaryDeltaWriter(deltaStream)));
+
+        // Sanity: the delta reconstructs the new compressed file exactly.
+        deltaStream.Seek(0, SeekOrigin.Begin);
+        var reconstructed = new MemoryStream();
+        new DeltaApplier().Apply(new MemoryStream(basisBytes), new BinaryDeltaReader(deltaStream, null), reconstructed);
+        Assert.That(reconstructed.ToArray().AsSpan().SequenceEqual(newBytes), Is.True);
+
+        return deltaStream.Length;
+    }
 }

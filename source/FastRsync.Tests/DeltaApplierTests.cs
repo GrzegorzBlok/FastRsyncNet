@@ -85,6 +85,41 @@ public class DeltaApplierTests
         CollectionAssert.AreEqual(newData, outputStream.ToArray());
     }
 
+    [Test]
+    public void Apply_WrongBasisFileLength_ThrowsFastBeforePatching()
+    {
+        // Arrange - a delta built against a 16974-byte basis (its metadata records BaseFileLength).
+        var (_, baseSignatureStream, _, newDataStream) = Utils.PrepareTestData(16974, 8452, SignatureBuilder.DefaultChunkSize);
+        var deltaStream = BuildDelta(baseSignatureStream, newDataStream);
+
+        // The classic mistake (cf. issue #11): applying against the wrong basis file, here one of a
+        // different length. The pre-flight basis-length check (on by default) catches it up front.
+        var wrongBasis = new MemoryStream(new byte[12345]);
+        var outputStream = new MemoryStream();
+
+        // Act & Assert - fails immediately with a clear message, before any output is written.
+        var ex = Assert.Throws<InvalidDataException>(() =>
+            new DeltaApplier().Apply(wrongBasis, new BinaryDeltaReader(deltaStream, null), outputStream));
+        Assert.That(ex.Message, Does.Contain("basis file"));
+        Assert.That(outputStream.Length, Is.EqualTo(0));
+    }
+
+    [Test]
+    public void Apply_WrongBasisFileLength_WithSkipHashCheck_DoesNotThrowLengthError()
+    {
+        // Arrange - with verification skipped, the fast basis-length check is skipped too (both are
+        // gated by SkipHashCheck), so the pre-flight guard does not fire.
+        var (_, baseSignatureStream, _, newDataStream) = Utils.PrepareTestData(16974, 8452, SignatureBuilder.DefaultChunkSize);
+        var deltaStream = BuildDelta(baseSignatureStream, newDataStream);
+
+        var wrongBasis = new MemoryStream(new byte[12345]);
+        var outputStream = new MemoryStream();
+
+        // Act & Assert - no InvalidDataException about the basis length is thrown up front.
+        Assert.DoesNotThrow(() =>
+            new DeltaApplier { SkipHashCheck = true }.Apply(wrongBasis, new BinaryDeltaReader(deltaStream, null), outputStream));
+    }
+
     private static MemoryStream BuildDelta(MemoryStream baseSignatureStream, MemoryStream newDataStream)
     {
         var deltaStream = new MemoryStream();

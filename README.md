@@ -163,7 +163,8 @@ Version guarantees:
 
 * FastRsyncNet 2.x can read signatures and deltas produced by FastRsyncNet 1.x and by Octodiff.
 * Files produced by FastRsyncNet 2.x are **not** recognized by FastRsyncNet 1.x (the signature and delta format changed in 2.0.0).
-* All 2.x releases are mutually compatible: files produced by any 2.x version can be read by any other 2.x version. Newer 2.x releases may add optional fields to the metadata, which older 2.x readers safely ignore.
+* All 2.x releases are mutually compatible at the format level: files produced by any 2.x version can be read by any other 2.x version. Newer 2.x releases may add optional fields to the metadata, which older 2.x readers safely ignore.
+* One exception is the choice of algorithm. The xxHash3 (`XXH3`) hashing algorithm was introduced in FastRsyncNet 2.4.0. A signature or delta created with xxHash3 records that algorithm name in its metadata, so reading it with FastRsyncNet earlier than 2.4.0 throws a `NotSupportedException` ("The hash algorithm 'XXH3' is not supported"). If you need the file to be readable by pre-2.4.0 versions, use one of the older algorithms (the default xxHash64, SHA1 or MD5) instead.
 
 ## Security considerations
 

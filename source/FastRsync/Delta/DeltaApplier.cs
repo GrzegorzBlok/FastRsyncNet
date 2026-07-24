@@ -28,6 +28,9 @@ namespace FastRsync.Delta
 
         public void Apply(Stream basisFileStream, IDeltaReader delta, Stream outputStream)
         {
+            if (!SkipHashCheck)
+                ValidateBasisFileLength(basisFileStream, delta);
+
             var rented = PooledBuffer.Rent(readBufferSize, UseBufferPool);
             var buffer = rented.Array;
             try
@@ -71,6 +74,9 @@ namespace FastRsync.Delta
 
         public async Task ApplyAsync(Stream basisFileStream, IDeltaReader delta, Stream outputStream, CancellationToken cancellationToken)
         {
+            if (!SkipHashCheck)
+                ValidateBasisFileLength(basisFileStream, delta);
+
             var rented = PooledBuffer.Rent(readBufferSize, UseBufferPool);
             var buffer = rented.Array;
             try
@@ -106,6 +112,16 @@ namespace FastRsync.Delta
                     throw new InvalidDataException(
                         $"Verification of the patched file failed. The {delta.Metadata.ExpectedFileHashAlgorithm} hash of the patch result file, and the file that was used as input for the delta, do not match. This can happen if the basis file changed since the signatures were calculated.");
                 }
+            }
+        }
+
+        private static void ValidateBasisFileLength(Stream basisFileStream, IDeltaReader delta)
+        {
+            var expectedLength = delta.Metadata?.BaseFileLength;
+            if (expectedLength.HasValue && basisFileStream.CanSeek && basisFileStream.Length != expectedLength.Value)
+            {
+                throw new InvalidDataException(
+                    $"The basis file does not match the one the delta was built against (the delta expects a basis of {expectedLength.Value} bytes but the supplied basis is {basisFileStream.Length} bytes). Make sure the delta is being applied to the correct basis file.");
             }
         }
 
