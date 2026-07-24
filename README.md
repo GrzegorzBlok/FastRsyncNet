@@ -131,6 +131,14 @@ using (var signatureStream = await signatureBlob.OpenWriteAsync(overwrite: true)
 * **Metadata file lengths** - signatures record the basis file length; deltas record the basis and target file lengths. `DeltaApplier` uses the target length to preallocate the output when writing to a fresh seekable stream. These fields are ignored by older versions.
 * **`UseBufferPool`** on `DeltaBuilder`, `DeltaApplier` and `BinaryDeltaReader` (default `true`) - rents the multi-megabyte working buffer from the shared array pool instead of allocating it per operation. This removes a large-object-heap allocation per operation, which reduces GC pressure noticeably when many operations run in the same process (e.g. a server). It does not change the output. Set it to `false` for one-shot or memory-sensitive local use, where the pool retaining buffers between operations is not worthwhile.
 
+## Thread safety
+
+As a general rule, **no FastRsyncNet class is guaranteed to be thread-safe for concurrent use of a single instance.** This applies to all of them - `SignatureBuilder`, `SignatureReader`, `SignatureWriter`, `DeltaBuilder`, `DeltaApplier`, `BinaryDeltaReader`, `BinaryDeltaWriter`, `AggregateCopyOperationsDecorator`, the hashing and rolling-checksum algorithm instances, progress reporters and the metadata/signature objects.
+
+To use FastRsyncNet from multiple threads, give **each concurrent operation its own set of instances** and do not share instances between threads. Used this way the library is fully thread-safe; many independent signature/delta/patch operations can run in parallel in the same process (the shared array buffer pool used internally is itself thread-safe).
+
+In particular, never share a hashing or rolling-checksum instance across concurrent operations. When you pass your own algorithms to `new SignatureBuilder(hashAlgorithm, rollingChecksumAlgorithm)`, create a fresh pair per operation; the parameterless constructor already does this for you. Likewise, use a separate progress reporter per operation rather than sharing one.
+
 ## Available algorithms and relative performance
 
 Following signature hashing algorithms are available:
