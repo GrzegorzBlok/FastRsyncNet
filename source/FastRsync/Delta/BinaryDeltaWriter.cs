@@ -35,14 +35,14 @@ namespace FastRsync.Delta
 
         public void WriteCopyCommand(DataRange segment)
         {
-            writer.Write(BinaryFormat.CopyCommand);
+            writer.Write((byte)DeltaCommandType.CopyCommand);
             writer.Write(segment.StartOffset);
             writer.Write(segment.Length);
         }
 
         public void WriteDataCommand(Stream source, long offset, long length)
         {
-            writer.Write(BinaryFormat.DataCommand);
+            writer.Write((byte)DeltaCommandType.DataCommand);
             writer.Write(length);
 
             var originalPosition = source.Position;
@@ -73,7 +73,7 @@ namespace FastRsync.Delta
         public async Task WriteDataCommandAsync(Stream source, long offset, long length,
             CancellationToken cancellationToken)
         {
-            writer.Write(BinaryFormat.DataCommand);
+            writer.Write((byte)DeltaCommandType.DataCommand);
             writer.Write(length);
 
             var originalPosition = source.Position;
