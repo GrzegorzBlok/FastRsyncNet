@@ -16,6 +16,7 @@ Capabilities at a glance:
 * Streaming design that works directly on network-backed streams such as Azure Blob.
 * Single-pass signature building that reads the basis file only once - roughly twice as fast over the network.
 * Optional rsync-friendly GZip compression via the companion `FastRsyncNet.Compression` package.
+* Delta **command plan** API (`BinaryDeltaReader.ReadCommands()`) for applying a delta out-of-band - for example assembling the patched file server-side with Azure *Put Block From URL*, so no file bytes flow through your process.
 
 ## Install [![NuGet](https://img.shields.io/nuget/v/FastRsyncNet.svg?style=flat)](https://www.nuget.org/packages/FastRsyncNet/)
 Add to a project via NuGet:
@@ -123,6 +124,75 @@ using (var signatureStream = await signatureBlob.OpenWriteAsync(overwrite: true)
     await signatureBuilder.BuildAsync(basisStream, new SignatureWriter(signatureStream), cancellationToken);
 }
 ```
+
+### Server-side patching on Azure with Put Block From URL (block assembly)
+
+For large files stored in Azure Blob Storage, you can apply a delta without streaming any file bytes through your process. Instead of downloading the basis file, running DeltaApplier, and uploading the result, you can read the delta's command plan and have Azure assemble the patched blob server-side using Put Block From URL (StageBlockFromUri). Unchanged ranges are copied directly from the basis blob, while new ranges are copied directly from the delta blob.
+
+BinaryDeltaReader.ReadCommands() returns the plan as an IReadOnlyList<DeltaCommand>. Each DeltaCommand contains a Type, Offset, and Length:
+
+DeltaCommandType.CopyCommand - copies Length bytes starting at Offset from the basis file.
+DeltaCommandType.DataCommand - represents Length new bytes stored inline in the delta. In this case, Offset is the absolute position of those bytes within the delta stream itself.
+
+As a result, Copy commands map to ranges in the basis blob, while Data commands map to ranges in the delta blob. Reading the plan requires processing only the small command headers; the payload containing the new bytes is skipped. This makes the operation inexpensive even for large deltas. The delta stream must be seekable, and OpenReadAsync() provides a seekable stream.
+
+Block assembly validates its inputs, not the output. If the basis blob exactly matches the file against which the delta was generated, the command plan reconstructs the target file by design. Before assembling the blocks, verify this by comparing the basis blob's Content-MD5 value with the delta's BaseFileHash (both are whole-file MD5 hashes) and, when available, comparing the blob length with BaseFileLength.
+
+```csharp
+using Azure;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
+using Azure.Storage.Blobs.Specialized;
+using Azure.Storage.Sas;
+using FastRsync.Delta;
+
+...
+
+var container = new BlobServiceClient("azure storage connectionstring").GetBlobContainerClient("containerName");
+var basisBlob = container.GetBlockBlobClient("blob");
+var deltaBlob = container.GetBlockBlobClient("blob_delta");
+var targetBlob = container.GetBlockBlobClient("blob_patched");
+
+DeltaMetadata metadata;
+IReadOnlyList<DeltaCommand> plan;
+using (var deltaStream = await deltaBlob.OpenReadAsync())
+{
+    var reader = new BinaryDeltaReader(deltaStream, null);
+    plan = reader.ReadCommands();
+    metadata = reader.Metadata;
+}
+
+var basisProperties = (await basisBlob.GetPropertiesAsync()).Value;
+var basisMatchesDelta =
+    basisProperties.ContentHash is not null &&
+    Convert.ToBase64String(basisProperties.ContentHash) == metadata.BaseFileHash &&
+    (metadata.BaseFileLength is null || basisProperties.ContentLength == metadata.BaseFileLength);
+if (!basisMatchesDelta)
+{
+    throw new InvalidOperationException("Basis blob does not match the delta.");
+}
+
+var basisSas = basisBlob.GenerateSasUri(BlobSasPermissions.Read, DateTimeOffset.UtcNow.AddHours(1));
+var deltaSas = deltaBlob.GenerateSasUri(BlobSasPermissions.Read, DateTimeOffset.UtcNow.AddHours(1));
+
+var blockIds = new List<string>(plan.Count);
+for (var i = 0; i < plan.Count; i++)
+{
+    var command = plan[i];
+    var blockId = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(i.ToString("D8")));
+    var sourceUri = command.Type == DeltaCommandType.CopyCommand ? basisSas : deltaSas;
+
+    await targetBlob.StageBlockFromUriAsync(sourceUri, blockId,
+        new StageBlockFromUriOptions { SourceRange = new HttpRange(command.Offset, command.Length) });
+
+    blockIds.Add(blockId);
+}
+```
+
+Notes and limits:
+
+* **Block count.** One block is staged per delta command, and Azure allows at most **50,000 blocks per blob**; deltas with more commands than that must use the streaming apply.
+* The `ReadCommands()` / `DeltaCommand` plan API is available since FastRsyncNet 2.4.9.
 
 ## Performance tuning
 
