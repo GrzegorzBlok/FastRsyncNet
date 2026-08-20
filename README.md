@@ -127,16 +127,8 @@ using (var signatureStream = await signatureBlob.OpenWriteAsync(overwrite: true)
 
 ### Server-side patching on Azure with Put Block From URL (block assembly)
 
-For large files stored in Azure Blob Storage, you can apply a delta without streaming any file bytes through your process. Instead of downloading the basis file, running DeltaApplier, and uploading the result, you can read the delta's command plan and have Azure assemble the patched blob server-side using Put Block From URL (StageBlockFromUri). Unchanged ranges are copied directly from the basis blob, while new ranges are copied directly from the delta blob.
+For large files stored in Azure Blob Storage, you can apply a delta without streaming any file bytes through your process. Instead of downloading the basis file, running DeltaApplier, and uploading the result, you can read the delta's command plan and have Azure Storage assemble the patched blob server-side using Put Block From URL (StageBlockFromUri). Unchanged ranges are copied directly from the basis blob, while new ranges are copied directly from the delta blob.
 
-BinaryDeltaReader.ReadCommands() returns the plan as an IReadOnlyList<DeltaCommand>. Each DeltaCommand contains a Type, Offset, and Length:
-
-DeltaCommandType.CopyCommand - copies Length bytes starting at Offset from the basis file.
-DeltaCommandType.DataCommand - represents Length new bytes stored inline in the delta. In this case, Offset is the absolute position of those bytes within the delta stream itself.
-
-As a result, Copy commands map to ranges in the basis blob, while Data commands map to ranges in the delta blob. Reading the plan requires processing only the small command headers; the payload containing the new bytes is skipped. This makes the operation inexpensive even for large deltas. The delta stream must be seekable, and OpenReadAsync() provides a seekable stream.
-
-Block assembly validates its inputs, not the output. If the basis blob exactly matches the file against which the delta was generated, the command plan reconstructs the target file by design. Before assembling the blocks, verify this by comparing the basis blob's Content-MD5 value with the delta's BaseFileHash (both are whole-file MD5 hashes) and, when available, comparing the blob length with BaseFileLength.
 
 ```csharp
 using Azure;
@@ -191,7 +183,7 @@ for (var i = 0; i < plan.Count; i++)
 
 Notes and limits:
 
-* **Block count.** One block is staged per delta command, and Azure allows at most **50,000 blocks per blob**; deltas with more commands than that must use the streaming apply.
+* **Block count.** One block is staged per delta command, and Azure allows at most **50000 blocks per blob**; deltas with more commands than that must use the streaming apply.
 * The `ReadCommands()` / `DeltaCommand` plan API is available since FastRsyncNet 2.4.9.
 
 ## Performance tuning
@@ -242,7 +234,10 @@ Version guarantees:
 * FastRsyncNet 2.x can read signatures and deltas produced by FastRsyncNet 1.x and by Octodiff.
 * Files produced by FastRsyncNet 2.x are **not** recognized by FastRsyncNet 1.x (the signature and delta format changed in 2.0.0).
 * All 2.x releases are mutually compatible at the format level: files produced by any 2.x version can be read by any other 2.x version. Newer 2.x releases may add optional fields to the metadata, which older 2.x readers safely ignore.
-* One exception is the choice of algorithm. The xxHash3 (`XXH3`) hashing algorithm was introduced in FastRsyncNet 2.4.0. A signature or delta created with xxHash3 records that algorithm name in its metadata, so reading it with FastRsyncNet earlier than 2.4.0 throws a `NotSupportedException` ("The hash algorithm 'XXH3' is not supported"). If you need the file to be readable by pre-2.4.0 versions, use one of the older algorithms (the default xxHash64, SHA1 or MD5) instead.
+* One exception is the choice of algorithm. Selecting a *newer* hashing or rolling-checksum algorithm records that algorithm's name in the file's metadata, and a FastRsyncNet version that predates the algorithm throws a `NotSupportedException` when it reads such a file. Two algorithms were added after 2.0.0:
+  * The xxHash3 (`XXH3`) hashing algorithm was introduced in FastRsyncNet 2.4.0. A signature or delta created with it records `XXH3`, so reading it with a version earlier than 2.4.0 throws `NotSupportedException` ("The hash algorithm 'XXH3' is not supported").
+  * The Adler32RollingChecksumV3 (`Adler32V3`) rolling-checksum algorithm was introduced in FastRsyncNet 2.4.5. A signature created with it records `Adler32V3`, so using that signature with a version earlier than 2.4.5 (for example, to build a delta) throws `NotSupportedException` ("The rolling checksum algorithm 'Adler32V3' is not supported").
+  * If a file must be readable by an older version, stay on the defaults (the default xxHash64 hash and Adler32 rolling checksum) or another algorithm that the older version already supports.
 
 ## Security considerations
 
