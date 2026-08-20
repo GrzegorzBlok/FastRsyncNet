@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.8.34309.116
+# Visual Studio Version 18
+VisualStudioVersion = 18.6.11822.322 stable
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Octodiff", "Octodiff\Octodiff.csproj", "{BBA7CDC2-DE25-4131-89F2-506712178FC8}"
 EndProject
@@ -18,6 +18,12 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FastRsync.Compression", "FastRsync.Compression\FastRsync.Compression.csproj", "{FA7C7A6D-68E6-445C-BD19-DD1FFBB34239}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FastRsync.BackwardCompatibilityTests", "FastRsync.BackwardCompatibilityTests\FastRsync.BackwardCompatibilityTests.csproj", "{1F46EE18-00B8-49E4-8990-633410B807A2}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{836B080C-E6D4-48AD-A59E-C9CF0D182E73}"
+	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
+		Directory.Packages.props = Directory.Packages.props
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -1,0 +1,30 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- FastRsync library dependencies -->
+    <PackageVersion Include="System.Text.Json" Version="8.0.5" />
+
+    <!-- The library deliberately pins an older System.IO.Hashing so consumers are not forced onto a
+         newer floor; FastRsync.Tests and FastRsync.Benchmarks pin 10.0.1 via VersionOverride. -->
+    <PackageVersion Include="System.IO.Hashing" Version="8.0.0" />
+    <PackageVersion Include="System.Memory" Version="4.6.0" />
+
+    <!-- FastRsync.Compression -->
+    <PackageVersion Include="ProDotNetZip" Version="1.20.0" />
+
+    <!-- Tests and benchmarks -->
+    <PackageVersion Include="Microsoft.Bcl.Memory" Version="10.0.4" />
+    <PackageVersion Include="Azure.Storage.Blobs" Version="12.27.0" />
+    <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageVersion Include="NSubstitute" Version="5.3.0" />
+    <PackageVersion Include="NUnit" Version="4.4.0" />
+    <PackageVersion Include="NUnit3TestAdapter" Version="6.1.0" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
+    <PackageVersion Include="System.Data.HashFunction.Core" Version="2.0.0" />
+    <PackageVersion Include="System.Data.HashFunction.Interfaces" Version="2.0.0" />
+    <PackageVersion Include="System.Data.HashFunction.xxHash" Version="2.0.0" />
+  </ItemGroup>
+</Project>

@@ -13,7 +13,7 @@
     <AssemblyVersion>2.4.9</AssemblyVersion>
     <FileVersion>2.4.9</FileVersion>
     <VersionPrefix>2.4.9</VersionPrefix>
-    <VersionSuffix>beta1</VersionSuffix>
+    <VersionSuffix></VersionSuffix>
     <PackageTags>sync;rsync;synchronization</PackageTags>
     <Description>
       .NET library for file synchronization based on Rsync algorithm. Optimized for speed and data size to achieve best network performance.
@@ -46,9 +46,9 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="System.Text.Json" Version="8.0.5"/>
-    <PackageReference Include="System.IO.Hashing" Version="8.0.0"/>
-    <PackageReference Include="System.Memory" Version="4.6.0" Condition="'$(TargetFramework)' != 'net7.0'"/>
+    <PackageReference Include="System.Text.Json"/>
+    <PackageReference Include="System.IO.Hashing"/>
+    <PackageReference Include="System.Memory" Condition="'$(TargetFramework)' != 'net7.0'"/>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\README.md" Pack="true" PackagePath="\"/>

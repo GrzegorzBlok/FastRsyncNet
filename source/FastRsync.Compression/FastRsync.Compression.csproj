@@ -29,7 +29,7 @@
 </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="ProDotNetZip" Version="1.20.0" />
+    <PackageReference Include="ProDotNetZip" />
   </ItemGroup>
 
   <ItemGroup>
