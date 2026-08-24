@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Threading;
@@ -41,6 +42,9 @@ namespace FastRsync.Delta
 
         private DeltaMetadata _metadata;
         private RsyncFormatType type;
+        // Stream position where the command section begins (right after the metadata), recorded
+        // when the header is parsed. Used by ReadCommands to reposition reliably.
+        private long commandsStartPosition = -1;
 
         public DeltaMetadata Metadata
         {
@@ -131,6 +135,7 @@ namespace FastRsync.Delta
             }
 
             type = RsyncFormatType.FastRsync;
+            commandsStartPosition = reader.BaseStream.Position;
         }
 
         private void ReadOctoDeltaHeader()
@@ -161,6 +166,55 @@ namespace FastRsync.Delta
             };
 
             type = RsyncFormatType.Octodiff;
+            commandsStartPosition = reader.BaseStream.Position;
+        }
+
+        /// <summary>
+        /// Parses the delta's command stream and returns the ordered plan of copy/data operations
+        /// without applying it. For each <see cref="DeltaCommandType.DataCommand"/> command the returned
+        /// <see cref="DeltaCommand.Offset"/> is the absolute offset of the payload within the delta
+        /// stream, so callers can read the new bytes directly from the delta (e.g. to assemble an
+        /// Azure block blob with Put Block From URL). Does not read the data payloads.
+        /// The delta stream must be seekable. Idempotent - may be called more than once.
+        /// </summary>
+        public IReadOnlyList<DeltaCommand> ReadCommands()
+        {
+            ReadMetadata();
+
+            var fileLength = reader.BaseStream.Length;
+            reader.BaseStream.Seek(commandsStartPosition, SeekOrigin.Begin);
+
+            var commands = new List<DeltaCommand>();
+            while (reader.BaseStream.Position != fileLength)
+            {
+                var b = reader.ReadByte();
+                if (b == (byte)DeltaCommandType.CopyCommand)
+                {
+                    var start = reader.ReadInt64();
+                    var length = reader.ReadInt64();
+                    if (start < 0 || length < 0)
+                        throw new InvalidDataException("The delta file appears to be corrupt; a copy command has a negative offset or length.");
+                    commands.Add(new DeltaCommand(DeltaCommandType.CopyCommand, start, length));
+                }
+                else if (b == (byte)DeltaCommandType.DataCommand)
+                {
+                    var length = reader.ReadInt64();
+                    if (length < 0)
+                        throw new InvalidDataException("The delta file appears to be corrupt; a data command has a negative length.");
+                    var payloadOffset = reader.BaseStream.Position;
+                    if (payloadOffset + length > fileLength)
+                        throw new InvalidDataException("The delta file appears to be corrupt; a data command is truncated.");
+                    commands.Add(new DeltaCommand(DeltaCommandType.DataCommand, payloadOffset, length));
+                    // Skip the payload rather than reading it.
+                    reader.BaseStream.Seek(length, SeekOrigin.Current);
+                }
+                else
+                {
+                    throw new InvalidDataException($"The delta file appears to be corrupt; encountered an unknown command 0x{b:X2}.");
+                }
+            }
+
+            return commands;
         }
 
         public void Apply(
@@ -189,7 +243,7 @@ namespace FastRsync.Delta
                     Total = fileLength
                 });
 
-                if (b == BinaryFormat.CopyCommand)
+                if (b == (byte)DeltaCommandType.CopyCommand)
                 {
                     var start = commandReader.ReadInt64();
                     var length = commandReader.ReadInt64();
@@ -197,7 +251,7 @@ namespace FastRsync.Delta
                         throw new InvalidDataException("The delta file appears to be corrupt; a copy command has a negative offset or length.");
                     copy(start, length);
                 }
-                else if (b == BinaryFormat.DataCommand)
+                else if (b == (byte)DeltaCommandType.DataCommand)
                 {
                     var length = commandReader.ReadInt64();
                     if (length < 0)
@@ -247,7 +301,7 @@ namespace FastRsync.Delta
                         Total = fileLength
                     });
 
-                    if (b == BinaryFormat.CopyCommand)
+                    if (b == (byte)DeltaCommandType.CopyCommand)
                     {
                         var start = commandReader.ReadInt64();
                         var length = commandReader.ReadInt64();
@@ -255,7 +309,7 @@ namespace FastRsync.Delta
                             throw new InvalidDataException("The delta file appears to be corrupt; a copy command has a negative offset or length.");
                         await copy(start, length).ConfigureAwait(false);
                     }
-                    else if (b == BinaryFormat.DataCommand)
+                    else if (b == (byte)DeltaCommandType.DataCommand)
                     {
                         var length = commandReader.ReadInt64();
                         if (length < 0)

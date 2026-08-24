@@ -16,6 +16,7 @@ Capabilities at a glance:
 * Streaming design that works directly on network-backed streams such as Azure Blob.
 * Single-pass signature building that reads the basis file only once - roughly twice as fast over the network.
 * Optional rsync-friendly GZip compression via the companion `FastRsyncNet.Compression` package.
+* Delta **command plan** API (`BinaryDeltaReader.ReadCommands()`) for applying a delta out-of-band - for example assembling the patched file server-side with Azure *Put Block From URL*, so no file bytes flow through your process.
 
 ## Install [![NuGet](https://img.shields.io/nuget/v/FastRsyncNet.svg?style=flat)](https://www.nuget.org/packages/FastRsyncNet/)
 Add to a project via NuGet:
@@ -124,6 +125,67 @@ using (var signatureStream = await signatureBlob.OpenWriteAsync(overwrite: true)
 }
 ```
 
+### Server-side patching on Azure with Put Block From URL (block assembly)
+
+For large files stored in Azure Blob Storage, you can apply a delta without streaming any file bytes through your process. Instead of downloading the basis file, running DeltaApplier, and uploading the result, you can read the delta's command plan and have Azure Storage assemble the patched blob server-side using Put Block From URL (StageBlockFromUri). Unchanged ranges are copied directly from the basis blob, while new ranges are copied directly from the delta blob.
+
+
+```csharp
+using Azure;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
+using Azure.Storage.Blobs.Specialized;
+using Azure.Storage.Sas;
+using FastRsync.Delta;
+
+...
+
+var container = new BlobServiceClient("azure storage connectionstring").GetBlobContainerClient("containerName");
+var basisBlob = container.GetBlockBlobClient("blob");
+var deltaBlob = container.GetBlockBlobClient("blob_delta");
+var targetBlob = container.GetBlockBlobClient("blob_patched");
+
+DeltaMetadata metadata;
+IReadOnlyList<DeltaCommand> plan;
+using (var deltaStream = await deltaBlob.OpenReadAsync())
+{
+    var reader = new BinaryDeltaReader(deltaStream, null);
+    plan = reader.ReadCommands();
+    metadata = reader.Metadata;
+}
+
+var basisProperties = (await basisBlob.GetPropertiesAsync()).Value;
+var basisMatchesDelta =
+    basisProperties.ContentHash is not null &&
+    Convert.ToBase64String(basisProperties.ContentHash) == metadata.BaseFileHash &&
+    (metadata.BaseFileLength is null || basisProperties.ContentLength == metadata.BaseFileLength);
+if (!basisMatchesDelta)
+{
+    throw new InvalidOperationException("Basis blob does not match the delta.");
+}
+
+var basisSas = basisBlob.GenerateSasUri(BlobSasPermissions.Read, DateTimeOffset.UtcNow.AddHours(1));
+var deltaSas = deltaBlob.GenerateSasUri(BlobSasPermissions.Read, DateTimeOffset.UtcNow.AddHours(1));
+
+var blockIds = new List<string>(plan.Count);
+for (var i = 0; i < plan.Count; i++)
+{
+    var command = plan[i];
+    var blockId = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(i.ToString("D8")));
+    var sourceUri = command.Type == DeltaCommandType.CopyCommand ? basisSas : deltaSas;
+
+    await targetBlob.StageBlockFromUriAsync(sourceUri, blockId,
+        new StageBlockFromUriOptions { SourceRange = new HttpRange(command.Offset, command.Length) });
+
+    blockIds.Add(blockId);
+}
+```
+
+Notes and limits:
+
+* **Block count.** One block is staged per delta command, and Azure allows at most **50000 blocks per blob**; deltas with more commands than that must use the streaming apply.
+* The `ReadCommands()` / `DeltaCommand` plan API is available since FastRsyncNet 2.4.9.
+
 ## Performance tuning
 
 * **`SignatureBuilder.SinglePassBuild`** (default `true`) - the basis file is read only once; the verification hash is computed incrementally while the chunk signatures are gathered. This roughly halves the I/O and is about twice as fast when the basis file is a network-backed stream. The produced signature is byte-for-byte identical to the two-pass output. It buffers the chunk signatures in memory (about 1% of the basis file size); set it to `false` to stream them directly at the cost of reading the basis file twice.
@@ -172,7 +234,10 @@ Version guarantees:
 * FastRsyncNet 2.x can read signatures and deltas produced by FastRsyncNet 1.x and by Octodiff.
 * Files produced by FastRsyncNet 2.x are **not** recognized by FastRsyncNet 1.x (the signature and delta format changed in 2.0.0).
 * All 2.x releases are mutually compatible at the format level: files produced by any 2.x version can be read by any other 2.x version. Newer 2.x releases may add optional fields to the metadata, which older 2.x readers safely ignore.
-* One exception is the choice of algorithm. The xxHash3 (`XXH3`) hashing algorithm was introduced in FastRsyncNet 2.4.0. A signature or delta created with xxHash3 records that algorithm name in its metadata, so reading it with FastRsyncNet earlier than 2.4.0 throws a `NotSupportedException` ("The hash algorithm 'XXH3' is not supported"). If you need the file to be readable by pre-2.4.0 versions, use one of the older algorithms (the default xxHash64, SHA1 or MD5) instead.
+* One exception is the choice of algorithm. Selecting a *newer* hashing or rolling-checksum algorithm records that algorithm's name in the file's metadata, and a FastRsyncNet version that predates the algorithm throws a `NotSupportedException` when it reads such a file. Two algorithms were added after 2.0.0:
+  * The xxHash3 (`XXH3`) hashing algorithm was introduced in FastRsyncNet 2.4.0. A signature or delta created with it records `XXH3`, so reading it with a version earlier than 2.4.0 throws `NotSupportedException` ("The hash algorithm 'XXH3' is not supported").
+  * The Adler32RollingChecksumV3 (`Adler32V3`) rolling-checksum algorithm was introduced in FastRsyncNet 2.4.5. A signature created with it records `Adler32V3`, so using that signature with a version earlier than 2.4.5 (for example, to build a delta) throws `NotSupportedException` ("The rolling checksum algorithm 'Adler32V3' is not supported").
+  * If a file must be readable by an older version, stay on the defaults (the default xxHash64 hash and Adler32 rolling checksum) or another algorithm that the older version already supports.
 
 ## Security considerations
 

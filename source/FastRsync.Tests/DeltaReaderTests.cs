@@ -108,7 +108,7 @@ public class DeltaReaderTests
         // Arrange - copy command with negative offset and length
         var deltaStream = CreateFastRsyncDeltaStream(EmptyMd5Base64, bw =>
         {
-            bw.Write((byte)0x60); // BinaryFormat.CopyCommand
+            bw.Write((byte)DeltaCommandType.CopyCommand);
             bw.Write(-1L);
             bw.Write(-1L);
         });
@@ -125,7 +125,7 @@ public class DeltaReaderTests
         // Before validation was added, this spun forever in the read loop.
         var deltaStream = CreateFastRsyncDeltaStream(EmptyMd5Base64, bw =>
         {
-            bw.Write((byte)0x80); // BinaryFormat.DataCommand
+            bw.Write((byte)DeltaCommandType.DataCommand);
             bw.Write(100L);
             bw.Write(new byte[] { 1, 2, 3, 4, 5 });
         });
@@ -141,7 +141,7 @@ public class DeltaReaderTests
         // Arrange
         var deltaStream = CreateFastRsyncDeltaStream(EmptyMd5Base64, bw =>
         {
-            bw.Write((byte)0x80); // BinaryFormat.DataCommand
+            bw.Write((byte)DeltaCommandType.DataCommand);
             bw.Write(100L);
             bw.Write(new byte[] { 1, 2, 3, 4, 5 });
         });

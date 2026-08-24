@@ -6,9 +6,6 @@ namespace FastRsync.Core
     {
         public const int SignatureFormatHeaderLength = 7; // OCTOSIG or FRSNCSG
         public const int DeltaFormatHeaderLength = 9; // OCTODELTA or FRSNCDLTA
-
-        public const byte CopyCommand = 0x60;
-        public const byte DataCommand = 0x80;
     }
 
     internal class OctoBinaryFormat
