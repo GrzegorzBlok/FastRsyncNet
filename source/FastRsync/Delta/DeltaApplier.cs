@@ -64,7 +64,7 @@ namespace FastRsync.Delta
                 if (!HashCheck(delta, outputStream))
                 {
                     throw new InvalidDataException(
-                        $"Verification of the patched file failed. The {delta.HashAlgorithm.Name} hash of the patch result file, and the file that was used as input for the delta, do not match. This can happen if the basis file changed since the signatures were calculated.");
+                        $"Verification of the patched file failed. The {delta.Metadata.ExpectedFileHashAlgorithm} hash of the patch result file, and the file that was used as input for the delta, do not match. This can happen if the basis file changed since the signatures were calculated.");
                 }
             }
         }

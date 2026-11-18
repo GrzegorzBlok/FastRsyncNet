@@ -2,6 +2,8 @@
   <PropertyGroup>
     <TargetFramework>net472</TargetFramework>
     <LangVersion>7.3</LangVersion>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
     <GenerateAssemblyTitleAttribute>false</GenerateAssemblyTitleAttribute>
     <GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
     <GenerateAssemblyDescriptionAttribute>false</GenerateAssemblyDescriptionAttribute>
@@ -39,6 +41,7 @@
   <ItemGroup>
     <PackageReference Include="NUnit" />
     <PackageReference Include="NUnit3TestAdapter" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="System.Data.DataSetExtensions" />
@@ -48,4 +51,8 @@
   <ItemGroup>
     <Service Include="{82a7f48d-3b50-4b1e-b82e-3ada8210c358}" />
   </ItemGroup>
+  <Target Name="UseTestBindingRedirectsForOctodiffExes" AfterTargets="CopyFilesToOutputDirectory" Condition="Exists('$(OutDir)$(TargetFileName).config')">
+    <Copy SourceFiles="$(OutDir)$(TargetFileName).config" DestinationFiles="$(OutDir)Octodiff.exe.config" />
+    <Copy SourceFiles="$(OutDir)$(TargetFileName).config" DestinationFiles="$(OutDir)OctodiffAsync.exe.config" />
+  </Target>
 </Project>

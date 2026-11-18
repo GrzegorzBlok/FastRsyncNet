@@ -23,7 +23,7 @@ Add to a project via NuGet:
 1. Right click on a project and click 'Manage NuGet Packages'.
 2. Search for 'FastRsyncNet' and click 'Install'.
 
-Supported target frameworks: .NET Framework 4.6.2, .NET Standard 2.0, and .NET 7.0 / 8.0 / 9.0 / 10.0.
+Supported target frameworks: .NET Framework 4.6.2, .NET Standard 2.0, and .NET 7.0 / 8.0 / 9.0 / 10.0 / 11.0.
 
 ## Examples
 

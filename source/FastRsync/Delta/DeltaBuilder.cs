@@ -99,7 +99,7 @@ namespace FastRsync.Delta
                     var startPosition = newFileStream.Position;
                     // Read only readBufferSize bytes: a pooled buffer may be larger, and the scan
                     // window logic below depends on this fixed size.
-                    var read = newFileStream.Read(buffer, 0, readBufferSize);
+                    var read = ReadWholeBuffer(newFileStream, buffer, readBufferSize);
                     if (read <= 0)
                         break;
 
@@ -241,7 +241,7 @@ namespace FastRsync.Delta
                     var startPosition = newFileStream.Position;
                     // Read only readBufferSize bytes: a pooled buffer may be larger, and the scan
                     // window logic below depends on this fixed size.
-                    var read = await newFileStream.ReadAsync(buffer, 0, readBufferSize, cancellationToken).ConfigureAwait(false);
+                    var read = await ReadWholeBufferAsync(newFileStream, buffer, readBufferSize, cancellationToken).ConfigureAwait(false);
                     if (read <= 0)
                         break;
 
@@ -324,6 +324,31 @@ namespace FastRsync.Delta
             }
 
             deltaWriter.Finish();
+        }
+
+        // Stream.Read may return less than the requested count before the end of the stream
+        // (network streams often do). The scan loop takes a buffer that is not full for the end
+        // of the file, so keep reading until the buffer is full or the stream ends.
+        private static int ReadWholeBuffer(Stream stream, byte[] buffer, int count)
+        {
+            var total = 0;
+            int read;
+            while (total < count && (read = stream.Read(buffer, total, count - total)) > 0)
+            {
+                total += read;
+            }
+            return total;
+        }
+
+        private static async Task<int> ReadWholeBufferAsync(Stream stream, byte[] buffer, int count, CancellationToken cancellationToken)
+        {
+            var total = 0;
+            int read;
+            while (total < count && (read = await stream.ReadAsync(buffer, total, count - total, cancellationToken).ConfigureAwait(false)) > 0)
+            {
+                total += read;
+            }
+            return total;
         }
 
         private static bool BaseFileHashMatches(SignatureMetadata signatureMetadata, byte[] newFileHash, string newFileHashAlgorithmName)

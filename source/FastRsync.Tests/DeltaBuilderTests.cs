@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using FastRsync.Core;
 using FastRsync.Delta;
@@ -190,5 +191,92 @@ public class DeltaBuilderTests
         var patchedDataStream = new MemoryStream();
         new DeltaApplier().Apply(baseDataStream, new BinaryDeltaReader(deltaStream, null), patchedDataStream);
         CollectionAssert.AreEqual(baseDataStream.ToArray(), patchedDataStream.ToArray());
+    }
+
+    [Test]
+    [TestCase(1000)]
+    [TestCase(4096)]
+    [TestCase(20000)]
+    public void BuildDelta_NewFileStreamReturnsShortReads_ProducesSameDeltaAsFullReads(int maxBytesPerRead)
+    {
+        // Arrange - the read buffer is much smaller than the file, so it is refilled several
+        // times, and every read of the new file returns less than the buffer size.
+        var (baseDataStream, baseSignatureStream, newData) = PrepareSlightlyChangedFile();
+
+        var expectedDeltaStream = new MemoryStream();
+        new DeltaBuilder(ShortReadsReadBufferSize).BuildDelta(new MemoryStream(newData), new SignatureReader(new MemoryStream(baseSignatureStream.ToArray()), null), new AggregateCopyOperationsDecorator(new BinaryDeltaWriter(expectedDeltaStream)));
+
+        // Act
+        var deltaStream = new MemoryStream();
+        new DeltaBuilder(ShortReadsReadBufferSize).BuildDelta(new ShortReadStream(newData, maxBytesPerRead), new SignatureReader(baseSignatureStream, null), new AggregateCopyOperationsDecorator(new BinaryDeltaWriter(deltaStream)));
+
+        // Assert - a short read must not be taken for the end of the file
+        CollectionAssert.AreEqual(expectedDeltaStream.ToArray(), deltaStream.ToArray());
+        Assert.That(deltaStream.Length, Is.LessThan(newData.Length / 2));
+
+        deltaStream.Seek(0, SeekOrigin.Begin);
+        var patchedDataStream = new MemoryStream();
+        new DeltaApplier().Apply(baseDataStream, new BinaryDeltaReader(deltaStream, null), patchedDataStream);
+        CollectionAssert.AreEqual(newData, patchedDataStream.ToArray());
+    }
+
+    [Test]
+    [TestCase(1000)]
+    [TestCase(4096)]
+    [TestCase(20000)]
+    public async Task BuildDeltaAsync_NewFileStreamReturnsShortReads_ProducesSameDeltaAsFullReads(int maxBytesPerRead)
+    {
+        // Arrange
+        var (baseDataStream, baseSignatureStream, newData) = PrepareSlightlyChangedFile();
+
+        var expectedDeltaStream = new MemoryStream();
+        await new DeltaBuilder(ShortReadsReadBufferSize).BuildDeltaAsync(new MemoryStream(newData), new SignatureReader(new MemoryStream(baseSignatureStream.ToArray()), null), new AggregateCopyOperationsDecorator(new BinaryDeltaWriter(expectedDeltaStream)));
+
+        // Act
+        var deltaStream = new MemoryStream();
+        await new DeltaBuilder(ShortReadsReadBufferSize).BuildDeltaAsync(new ShortReadStream(newData, maxBytesPerRead), new SignatureReader(baseSignatureStream, null), new AggregateCopyOperationsDecorator(new BinaryDeltaWriter(deltaStream)));
+
+        // Assert
+        CollectionAssert.AreEqual(expectedDeltaStream.ToArray(), deltaStream.ToArray());
+        Assert.That(deltaStream.Length, Is.LessThan(newData.Length / 2));
+
+        deltaStream.Seek(0, SeekOrigin.Begin);
+        var patchedDataStream = new MemoryStream();
+        await new DeltaApplier().ApplyAsync(baseDataStream, new BinaryDeltaReader(deltaStream, null), patchedDataStream);
+        CollectionAssert.AreEqual(newData, patchedDataStream.ToArray());
+    }
+
+    private const int ShortReadsReadBufferSize = 32 * 1024;
+
+    // The new file is the basis file with a small block in the middle replaced, so a correct
+    // delta consists almost entirely of copy commands.
+    private static (MemoryStream baseDataStream, MemoryStream baseSignatureStream, byte[] newData) PrepareSlightlyChangedFile()
+    {
+        var (baseDataStream, baseSignatureStream, _, _) = Utils.PrepareTestData(200000, 0, SignatureBuilder.DefaultChunkSize);
+
+        var newData = baseDataStream.ToArray();
+        var changedBlock = new byte[500];
+        new Random().NextBytes(changedBlock);
+        Array.Copy(changedBlock, 0, newData, newData.Length / 2, changedBlock.Length);
+
+        return (baseDataStream, baseSignatureStream, newData);
+    }
+
+    // Seekable stream that never returns more than maxBytesPerRead bytes from a single read,
+    // as network-backed streams commonly do.
+    private class ShortReadStream : MemoryStream
+    {
+        private readonly int maxBytesPerRead;
+
+        public ShortReadStream(byte[] data, int maxBytesPerRead) : base(data)
+        {
+            this.maxBytesPerRead = maxBytesPerRead;
+        }
+
+        public override int Read(byte[] buffer, int offset, int count) =>
+            base.Read(buffer, offset, Math.Min(count, maxBytesPerRead));
+
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+            base.ReadAsync(buffer, offset, Math.Min(count, maxBytesPerRead), cancellationToken);
     }
 }

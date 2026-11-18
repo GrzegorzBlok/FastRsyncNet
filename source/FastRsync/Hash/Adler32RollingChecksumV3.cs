@@ -1,7 +1,4 @@
-﻿using System.Reflection;
-using System.Runtime.CompilerServices;
-
-namespace FastRsync.Hash
+﻿namespace FastRsync.Hash
 {
     public class Adler32RollingChecksumV3 : IRollingChecksum
     {
